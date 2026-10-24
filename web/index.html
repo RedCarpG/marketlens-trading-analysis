@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>MarketLens</title>
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJtbGciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiMwMGU1ZmYiIC8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjZmYzZDlhIiAvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgcng9IjE1IiBmaWxsPSIjMTAxMzJhIiAvPjxjaXJjbGUgY3g9IjI4IiBjeT0iMjgiIHI9IjE2LjUiIGZpbGw9IiMwMGU1ZmYiIGZpbGwtb3BhY2l0eT0iLjEiIHN0cm9rZT0idXJsKCNtbGcpIiBzdHJva2Utd2lkdGg9IjQuNSIgLz48cGF0aCBkPSJNNDAuOCA0MC44IDUyLjUgNTIuNSIgc3Ryb2tlPSJ1cmwoI21sZykiIHN0cm9rZS13aWR0aD0iNyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiAvPjxwYXRoIGQ9Ik0yMCAyM3YxNE0yOCAxOS41djEzTTM2IDE1LjV2MTMiIHN0cm9rZT0iI2NmZDZmZiIgc3Ryb2tlLW9wYWNpdHk9Ii41NSIgc3Ryb2tlLXdpZHRoPSIxLjYiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgLz48cmVjdCB4PSIxNy44IiB5PSIyNyIgd2lkdGg9IjQuNCIgaGVpZ2h0PSI4IiByeD0iMSIgZmlsbD0iIzJlZTZhOCIgLz48cmVjdCB4PSIyNS44IiB5PSIyMi41IiB3aWR0aD0iNC40IiBoZWlnaHQ9IjciIHJ4PSIxIiBmaWxsPSIjZmY0ZDhkIiAvPjxyZWN0IHg9IjMzLjgiIHk9IjE4IiB3aWR0aD0iNC40IiBoZWlnaHQ9IjgiIHJ4PSIxIiBmaWxsPSIjMmVlNmE4IiAvPjwvc3ZnPg=="
+    />
+    <link rel="stylesheet" href="css/app.css" />
+  </head>
+  <body>
+    <!-- K线图铺满整页作为背景；顶栏、左侧自选、右侧面板浮在上面（半透明，可收起），右侧面板展开时价格轴移到面板左边。窄屏时恢复上下排列 -->
+    <div id="chart"></div>
+    <div id="tophot"></div>
+    <header class="top glass" id="top">
+      <div class="brand">
+        <svg width="24" height="24" viewBox="0 0 64 64" aria-hidden="true">
+          <defs>
+            <linearGradient id="mlg" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#00e5ff" />
+              <stop offset="1" stop-color="#ff3d9a" />
+            </linearGradient>
+          </defs>
+          <rect width="64" height="64" rx="15" fill="#10132a" />
+          <circle cx="28" cy="28" r="16.5" fill="#00e5ff" fill-opacity=".1" stroke="url(#mlg)" stroke-width="4.5" />
+          <path d="M40.8 40.8 52.5 52.5" stroke="url(#mlg)" stroke-width="7" stroke-linecap="round" />
+          <path
+            d="M20 23v14M28 19.5v13M36 15.5v13"
+            stroke="#cfd6ff"
+            stroke-opacity=".55"
+            stroke-width="1.6"
+            stroke-linecap="round"
+          />
+          <rect x="17.8" y="27" width="4.4" height="8" rx="1" fill="#2ee6a8" />
+          <rect x="25.8" y="22.5" width="4.4" height="7" rx="1" fill="#ff4d8d" />
+          <rect x="33.8" y="18" width="4.4" height="8" rx="1" fill="#2ee6a8" />
+        </svg>
+        <b>MarketLens</b>
+      </div>
+      <button class="sym" id="symb" title="自选列表（[）"></button>
+      <div id="st"></div>
+      <span class="mkt" id="mkt"></span>
+      <div class="seg" id="tfs"></div>
+      <div class="dd" id="mxdd">
+        <button class="ddb" id="mxb" title="各周期方向；点开查看周期矩阵">周期<span id="mxs"></span></button>
+        <div class="ddm" id="mxm">
+          <div class="mh">周期矩阵 · 点一行切换周期</div>
+          <div id="mx"></div>
+        </div>
+      </div>
+      <span class="tsep"></span>
+      <div class="dd">
+        <button class="ddb" id="insb">指标</button>
+        <div class="ddm" id="ins"></div>
+      </div>
+      <div class="dd">
+        <button class="ddb" id="mksb">标注</button>
+        <div class="ddm" id="mks"></div>
+      </div>
+      <span class="sp"></span>
+      <button id="lv" class="live" title="连接实时行情"><i></i><span>实时</span></button>
+      <button class="ib" id="focb" title="专注模式：只看K线（F）">
+        <svg
+          width="17"
+          height="17"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4" />
+        </svg>
+      </button>
+      <div class="dd" id="setd">
+        <button class="ddb nocaret ib" title="设置">
+          <svg
+            width="17"
+            height="17"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"
+            />
+          </svg>
+        </button>
+        <div class="ddm" id="setm">
+          <div class="ms">
+            <div class="mh">外观</div>
+            <div class="mrow">
+              <span>主题 <span class="mu sm" id="thmn"></span></span>
+              <div class="thm" id="thm"></div>
+            </div>
+            <div class="mrow">
+              <span>涨跌配色</span>
+              <div class="seg" id="sch"></div>
+            </div>
+            <div class="mrow">
+              <span>面板透明度</span>
+              <div class="seg" id="gls"></div>
+            </div>
+          </div>
+          <div class="ms">
+            <div class="mh">数据</div>
+            <div class="mrow">
+              <span>本地数据</span
+              ><label class="btn">导入 CSV<input type="file" id="csv" accept=".csv,.txt" hidden /></label>
+            </div>
+            <div class="mrow mstore"><span>本地K线存储</span><span id="storeinfo" class="sm"></span></div>
+          </div>
+        </div>
+      </div>
+    </header>
+    <aside class="glass" id="wlp">
+      <div class="wlh">
+        <span class="ttl">自选</span
+        ><button class="ib sm" id="wcol" title="收起自选（[）">
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <rect x="4" y="4" width="16" height="16" rx="2" />
+            <path d="M9 4v16M15 10l-2 2 2 2" />
+          </svg>
+        </button>
+      </div>
+      <div id="wl"></div>
+    </aside>
+    <button class="glass" id="wlr" title="展开自选（[）">
+      <svg
+        width="15"
+        height="15"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.8"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <rect x="4" y="4" width="16" height="16" rx="2" />
+        <path d="M9 4v16M14 10l2 2-2 2" /></svg
+      ><span id="wls"></span>
+    </button>
+    <aside class="glass" id="pn">
+      <nav class="tabs" id="pnt">
+        <button data-tab="an">分析</button>
+        <button data-tab="tr">交易<i class="bdg"></i></button>
+        <button data-tab="al">预警<i class="bdg"></i></button>
+        <span class="sp"></span>
+        <button class="ib sm" id="fold" title="本页的块全部展开 / 收起">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M7 15l5 5 5-5M7 9l5-5 5 5" />
+          </svg>
+        </button>
+        <button class="ib sm" id="pcol" title="收起面板（]）">
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <rect x="4" y="4" width="16" height="16" rx="2" />
+            <path d="M15 4v16M9 10l2 2-2 2" />
+          </svg>
+        </button>
+      </nav>
+      <div class="tabp" data-p="an"></div>
+      <div class="tabp" data-p="tr"></div>
+      <div class="tabp" data-p="al"></div>
+    </aside>
+    <nav class="glass" id="rail">
+      <button class="ib" id="pexp" title="展开面板（]）">
+        <svg
+          width="17"
+          height="17"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <rect x="4" y="4" width="16" height="16" rx="2" />
+          <path d="M15 4v16M10 10l-2 2 2 2" />
+        </svg>
+      </button>
+      <button class="ib" data-tab="an" title="分析">
+        <svg
+          width="17"
+          height="17"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M4 20h16M7 16v-5M12 16V7M17 16v-8" />
+        </svg>
+      </button>
+      <button class="ib" data-tab="tr" title="交易">
+        <svg
+          width="17"
+          height="17"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M7 10h13l-4-4M17 14H4l4 4" /></svg
+        ><i class="bdg"></i>
+      </button>
+      <button class="ib" data-tab="al" title="预警">
+        <svg
+          width="17"
+          height="17"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path
+            d="M10 5a2 2 0 1 1 4 0 7 7 0 0 1 4 6v3a4 4 0 0 0 2 3H4a4 4 0 0 0 2-3v-3a7 7 0 0 1 4-6M9 17v1a3 3 0 0 0 6 0v-1"
+          /></svg
+        ><i class="bdg"></i>
+      </button>
+    </nav>
+    <div class="selp glass" id="selp">
+      <span class="selt"></span><button class="selx" title="取消选中（Esc）">✕</button>
+    </div>
+    <div class="glass" id="note" hidden></div>
+    <button class="ib glass" id="focx" title="退出专注模式（Esc / F）">
+      <svg
+        width="17"
+        height="17"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.8"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M9 4v4a1 1 0 0 1-1 1H4M20 9h-4a1 1 0 0 1-1-1V4M15 20v-4a1 1 0 0 1 1-1h4M4 15h4a1 1 0 0 1 1 1v4" />
+      </svg>
+    </button>
+    <script src="https://cdn.jsdelivr.net/npm/klinecharts@9.8.0/dist/umd/klinecharts.min.js"></script>
+    <!-- 按顺序加载：core/ 为纯计算（无 DOM，可在 Node 中测试），其余为界面；app.js 最后加载并启动页面 -->
+    <script src="js/core/time.js"></script>
+    <script src="js/core/indicators.js"></script>
+    <script src="js/core/levels.js"></script>
+    <script src="js/core/mtf.js"></script>
+    <script src="js/core/scenarios.js"></script>
+    <script src="js/core/review.js"></script>
+    <script src="js/core/demo.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/data.js"></script>
+    <script src="js/alerts.js"></script>
+    <script src="js/marks.js"></script>
+    <script src="js/highlight.js"></script>
+    <script src="js/trades.js"></script>
+    <script src="js/hover.js"></script>
+    <script src="js/chart-indicators.js"></script>
+    <script src="js/panel.js"></script>
+    <script src="js/review-ui.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>

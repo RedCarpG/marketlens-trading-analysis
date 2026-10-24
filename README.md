@@ -1,0 +1,21 @@
+# MarketLens
+
+个人行情观察与分析工具：K线铺满整页，自上而下多周期分析（1M / 1w → 1d → 4h → 1h / 15m）、关键价位与前高前低、价格行为情景、价格预警、交易复盘。只读行情，不下单。
+
+**在线演示：** https://redcarpg.github.io/web-trading-MarketLens/
+演示页使用模拟K线、模拟交易记录和 Binance 公开行情（比特币）；规则未经回测，不构成投资建议。
+
+## 本地运行（含 eToro 行情与个人交易记录）
+
+1. 复制 `.env.example` 为 `.env`，填入 eToro 只读密钥（不需要任何写权限；`.env` 不入 Git）。
+2. `cd server && npm install && npm start`
+3. 浏览器打开 http://127.0.0.1:8787/
+
+代理只监听本机，只托管 `web/` 下的页面；说明见 [server/README.md](server/README.md)。不填密钥也能启动：模拟数据、CSV、Binance 照常可用。
+
+## 目录
+
+- `web/` 页面（KLineChart 9.8，普通脚本，无构建步骤）；`web/js/core/` 为纯计算，可在 Node 中测试
+- `server/` 本地代理（Node.js，eToro 行情、实时推送、交易记录、本地K线存储）
+- `tests/` `npm test`（Node 自带 node:test）
+- `docs/SPEC.md` 规格与设计记录；`docs/CONT.md` 进度记录

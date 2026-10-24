@@ -1,0 +1,16 @@
+{
+  "name": "marketlens-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MarketLens 本地代理：托管页面并转发 eToro 只读行情",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "ws": "8.18.0"
+  }
+}

@@ -1,0 +1,14 @@
+work/
+var/
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+node_modules/
+*.sqlite
+*.sqlite3
+*.db
+*.log
+# 只在本地：密钥配置、真实联调记录、个人交易记录
+docs/private/
