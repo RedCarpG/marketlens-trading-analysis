@@ -87,6 +87,39 @@ test('scenarios：支撑处出现长下影 → 支撑反弹做多，止损 < 入
   assert.equal(g.tgt, 110);
 });
 
+test('scenarios 收紧选项：loose=0 去掉强阳收回；htf=1 只认大周期价位；cool 冷却期内的重复触及不算新触发', () => {
+  const get = loadCore(),
+    scenarios = get('scenarios'),
+    DEF = { loose: 1, htf: 0, cool: 0 }; // 收紧前的规则，逐项打开收紧选项
+  const base = () => Array.from({ length: 30 }, (_, i) => bar(i * H, 103, 104, 102.5, 103.5));
+  const L = top => [
+    { p: 100, top, tfs: [top], touch: 3, side: 1 },
+    { p: 110, top, tfs: [top], touch: 3, side: -1 },
+  ];
+  const trig = (rb, lv, opt) =>
+    scenarios('1h', { rb, a: { a: 2 } }, lv, rb[rb.length - 1].close, opt).flatMap(c => c.trigs)[0];
+  /* 强阳收回：触及支撑，下影只占 15%，收在上部 */
+  const strong = base().concat(bar(30 * H, 100.3, 102, 100, 101.9));
+  assert.equal(trig(strong, L('1d'), DEF).shape, '强阳收回');
+  assert.equal(trig(strong, L('1d'), { ...DEF, loose: 0 }), undefined);
+  assert.equal(trig(strong, L('1d')), undefined); // 页面默认（SC_DEF）已去掉宽松形态
+  /* 长下影在 1h 自己的价位上：htf=1 时不算，换成日线价位则算 */
+  const wick = base().concat(bar(30 * H, 101.2, 101.6, 100.1, 101.5));
+  assert.equal(trig(wick, L('1h'), { ...DEF, htf: 1 }), undefined);
+  assert.equal(trig(wick, L('1d'), { ...DEF, htf: 1 }).shape, '长下影');
+  const offs = top =>
+    scenarios('1h', { rb: wick, a: { a: 2 } }, L(top), 101.5, { ...DEF, htf: 1 }).flatMap(c => c.alt.map(o => !!o.off));
+  assert.ok(offs('1h').length && offs('1h').every(Boolean)); // 本周期价位：条件情景标为不会触发
+  assert.ok(offs('1d').every(o => !o));
+  /* 3 根前已在同一支撑出现长下影：不冷却时最新一根是新触发；冷却 10 根时仍显示 3 根前那次 */
+  const twice = base();
+  twice[27] = bar(27 * H, 101.2, 101.6, 100.1, 101.5);
+  twice.push(bar(30 * H, 101.2, 101.6, 100.1, 101.5));
+  assert.equal(trig(twice, L('1d'), DEF).ago, 0);
+  assert.equal(trig(twice, L('1d'), { ...DEF, cool: 10 }).ago, 3);
+  assert.equal(trig(twice, L('1d'), { ...DEF, cool: 2 }).ago, 0);
+});
+
 test('analyze：不足 60 根返回 null', () => {
   const analyze = loadCore()('analyze');
   assert.equal(analyze(Array.from({ length: 59 }, (_, i) => bar(i * H, 1, 1, 1, 1))), null);

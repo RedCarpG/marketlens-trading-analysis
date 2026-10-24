@@ -26,8 +26,8 @@ function ctx(tf, raw) {
     asof: b[b.length - 1].timestamp,
   };
 }
-/* now：最新价（含未收盘K线），只用于判断当前价位置，不参与信号 */
-function analyzeMTF(T, C, now) {
+/* now：最新价（含未收盘K线），只用于判断当前价位置，不参与信号；sco：情景收紧选项（默认 SC_DEF，回测时可换） */
+function analyzeMTF(T, C, now, sco) {
   const t = C[T];
   if (!t || !t.a) return null;
   const hs = TFS.slice(TFS.indexOf(T) + 1)
@@ -97,5 +97,5 @@ function analyzeMTF(T, C, now) {
   const px0 = now ?? t.a.c,
     x = t.a.a,
     L = levels(T, C, px0, x, Math.min(t.lo150, px0) - x, Math.max(t.hi150, px0) + x);
-  return { s, adj, raw, v, st, conf, chain, why, t, L, want, sc: scenarios(T, t, L, px0) };
+  return { s, adj, raw, v, st, conf, chain, why, t, L, want, sc: scenarios(T, t, L, px0, sco) };
 }

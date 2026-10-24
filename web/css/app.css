@@ -626,7 +626,7 @@ body.wcol #wlp {
   pointer-events: none;
   transform: translateX(calc(-100% - 16px));
 }
-/* 专注模式：顶栏和两侧都收走，只看K线（价格轴回到最右）；鼠标移到窗口顶边时顶栏浮出，左上角按钮退出 */
+/* 专注模式：顶栏和两侧都收走，只看K线（价格轴回到最右）；鼠标移到窗口顶边时顶栏浮出，右上角按钮退出 */
 #tophot {
   position: fixed;
   z-index: 19;
@@ -665,7 +665,7 @@ body.focus #wlr {
   position: fixed;
   z-index: 21;
   top: 10px;
-  left: 10px;
+  right: 10px;
   color: var(--tx);
   border-radius: 10px;
   opacity: 0;

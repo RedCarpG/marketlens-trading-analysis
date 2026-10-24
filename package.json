@@ -5,6 +5,9 @@
   "description": "MarketLens — personal market analysis workbench (front end in web/, local proxy in server/)",
   "scripts": {
     "test": "node --test",
+    "backtest": "node tools/backtest.js",
+    "bt:compare": "node tools/bt-compare.js",
+    "import": "node tools/import-history.js",
     "format": "prettier --write web tests"
   },
   "devDependencies": {

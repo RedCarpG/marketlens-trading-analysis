@@ -177,4 +177,4 @@ class Upstream {
   close() { const w = this.ws; this.ws = null; if (w) w.close(); }
 }
 
-module.exports = { TFS, createClient, createTrader, advance, pickPrice, Upstream };
+module.exports = { TFS, createClient, createTrader, advance, pickPrice, Upstream, toMonths };

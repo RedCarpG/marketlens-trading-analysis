@@ -104,7 +104,17 @@ function anPanel(m) {
 <div class="mu sm">触发K线：${g.shape}；目标依据 ${g.tl ? g.tl.tfs.join('·') + ' 价位' : '2 倍风险'}；盈亏比 1:${g.rr.toFixed(1)}（未计成本）</div>`
             )
             .join('')}
-${act ? '' : c.alt.map(o => `<div class="mu sm">· 若${o.c} → <span style="color:${dc(o.dir)}">${o.dir > 0 ? '做多' : '做空'}</span>，目标 ${o.t ? f(o.t.p) : '2 倍风险'}${al(o.dir)}</div>`).join('')}</div>`;
+${
+  act
+    ? ''
+    : c.alt
+        .filter(o => !o.off)
+        .map(
+          o =>
+            `<div class="mu sm">· 若${o.c} → <span style="color:${dc(o.dir)}">${o.dir > 0 ? '做多' : '做空'}</span>，目标 ${o.t ? f(o.t.p) : '2 倍风险'}${al(o.dir)}</div>`
+        )
+        .join('') || `<div class="mu sm">· ${tf} 本周期价位，只作参考：情景只在更大周期的价位上触发</div>`
+}</div>`;
         })
         .join('') || '<div class="empty">附近没有关键价位</div>',
     /* 关键价位：上方阻力从高到低、中间最新价、下方支撑从高到低 */
@@ -141,7 +151,7 @@ ${blk('sc', `价格行为情景 <span class="mu">${tf} · 纯K线</span>`, scn, 
 ${blk('lv', `关键价位 <span class="mu">${tf} 及更大</span>`, keys, chip('hl', '前高前低') + chip('sr', '支撑阻力'))}
 ${blk('sg', `近期信号 <span class="n">${sigs.length}</span>`, sgl, chip('ar', '图上'))}
 ${blk('kv', `关键数值 <span class="mu">${tf}</span>`, `<div class="row"><span>RSI(14)</span><b>${a.rsi.toFixed(1)}</b></div><div class="row"><span>ATR(14)</span><b>${f(a.a)}</b></div>${a.hv ? '' : '<div class="row"><span>成交量</span><b class="mu">无（放量项不计分）</b></div>'}`)}
-<p class="disc">信号、评分与情景由规则自动生成，未经回测，仅作辅助参考，不构成投资建议。演示数据为随机模拟。</p>`;
+<p class="disc">信号、评分与情景由规则自动生成，初步回测未发现可靠优势，仅作辅助参考，不构成投资建议。演示数据为随机模拟。</p>`;
 }
 /* 预警页：总开关、三类提醒（可单独勾选）、通知权限状态、最近 10 条预警 */
 function alPanel() {

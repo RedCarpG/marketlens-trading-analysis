@@ -1,5 +1,6 @@
 // 回归测试：用拆分前的单文件版本在固定时间、模拟数据下算出的结果（fixtures/golden-demo.json）作为标准答案，
 // 现在的 core/ 代码必须逐字段一致。核心算法有意改动时，需要重新生成标准答案。
+// 情景触发规则 2026-10-25 已收紧（SC_DEF），这里按收紧前的选项计算，与标准答案对比；新规则由 core.test.js 单独测试。
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { loadCore } = require('./load-core');
@@ -28,7 +29,7 @@ test('core 输出与拆分前的标准答案一致（3 个模拟品种 × 6 个�
     for (const k of TFS) C[k] = ctx(k, all[k]);
     for (const k of TFS) {
       const now = all[k][all[k].length - 1].close,
-        m = analyzeMTF(k, C, now);
+        m = analyzeMTF(k, C, now, { loose: 1, htf: 0, cool: 0 });
       const out = m && {
         n: all[k].length,
         first: all[k][0],
