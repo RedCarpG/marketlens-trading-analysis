@@ -26,12 +26,12 @@
 
 整页布局（2026-10-24）：K线铺满窗口作为背景；顶栏半透明浮在上方，左栏自选并入顶栏品种下拉，周期矩阵改为顶栏下拉；分析/交易/预警面板移到左侧（压在旧K线上，价格轴和最新K线不被挡），可收成图标条（[）或进入专注模式（F）；面板透明度可选通透/适中/不透明；指标图例改为页面自绘以避开顶栏和面板；高亮定位、悬停卡按可见区域避让；窄屏恢复上下排列（SPEC 3.3.9）。已在浏览器验证宽屏（护眼/深色）、收起、专注、快捷键、矩阵下拉和手机宽度。同日按用户要求调整：分析面板回到右侧，展开时价格轴（含副图）左移到面板左边、最新K线随之让开，K线画布仍延伸到半透明面板下；自选移到左侧半透明面板，可收成竖窄条；快捷键 [ 开合自选、] 开合面板（SPEC 3.3.9）。副图开合加高度滑动动画（SPEC 3.3.8）。关键价位、情景可点击高亮并定位（价位缩放到上次触及与最新K线同屏，不标K线）；选中定位改为略偏右（52%）；无成交量时移除 VOL 不再播放动画（SPEC 3.3.3）。高亮闪烁、副图联动（竖条 + 指标触发点）、点击光晕与回弹、新增赛博朋克主题（SPEC 3.3.8）。修复滑动时指标比K线晚一帧：价格轴固定 70px 宽；标注晚一帧：高亮闪烁改为定位结束后开始。最新K线右侧加竖虚线分界、右侧区域淡色底。标注字体加大（13px）。新图标（放大镜 + K线，docs/icon.svg），用作标签页图标和顶栏标志。顶栏加行情状态标签（实时 · 交易中 / 休市 / 非实时），代理推送附带报价时间 qt（需重启代理，已重启）；选中定位改到 62%。
 
-公开与 GitHub Pages（2026-10-24）：仓库改为公开，历史重建为一个干净的提交；密钥配置、真实联调记录、个人交易记录与复盘结果移到本地 docs/private/LOCAL_NOTES.md（已 gitignore）；Pages 发布 web/（https://redcarpg.github.io/web-trading-MarketLens/），用模拟K线、模拟交易和 Binance 公开行情。
+公开与 GitHub Pages（2026-10-24）：仓库改为公开，历史重建为一个干净的提交；密钥配置、真实联调记录、个人交易记录与复盘结果移到本地 docs/private/LOCAL_NOTES.md（已 gitignore）；Pages 发布 web/，用模拟K线、模拟交易和 Binance 公开行情。同日改为全新的公开仓库 https://github.com/RedCarpG/web-trading-MarketLens-app（Pages：https://redcarpg.github.io/web-trading-MarketLens-app/），本地 origin 指向它；旧仓库 web-trading-MarketLens 不再使用，由用户自行删除。
 
 下一步候选：GC数据（eToro Micro Gold期货拼接连续合约或另找GC源）以后再议。
 
 已定（2026-10-22）：先用eToro GOLD（黄金CFD），GC期货数据源以后再议。
-待定：Binance适配器是否需要验证；v0.3中未写入项目说明的内容（手动ChatGPT分析包、经济日历与新闻、SQLite留痕）是否还要。DATA_VALIDATION.md仍按XAU/USD撰写，未更新。GitHub：2026-10-24 建仓库，同日更名为 https://github.com/RedCarpG/web-trading-MarketLens（命名规则：分类段小写、只有项目名大写；main，首次提交 3aa56df），.env、server/node_modules、work/ 均未上传。
+待定：Binance适配器是否需要验证；v0.3中未写入项目说明的内容（手动ChatGPT分析包、经济日历与新闻、SQLite留痕）是否还要。DATA_VALIDATION.md仍按XAU/USD撰写，未更新。GitHub：当前仓库 https://github.com/RedCarpG/web-trading-MarketLens-app（公开；命名规则：分类段小写、只有项目名大写；main），.env、server/node_modules、work/ 均未上传。
 
 环境：Node v18.14.0（已停止维护，代理可运行，建议升级）、Python 3.10.1、Git 2.35.1、Docker 26.0.0。
 
