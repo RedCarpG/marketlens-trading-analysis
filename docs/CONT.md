@@ -1,6 +1,6 @@
 # MarketLens 工作续接
 
-（2026-10-24 由 FinBot 更名为 MarketLens；本地目录仍为 X:\Project\FinBot，浏览器本地偏好键前缀改为 marketlens. 并自动迁移旧的 finbot.*）
+（2026-10-24 由 FinBot 更名为 MarketLens；本地目录同日改为 X:\Project\MarketLens，浏览器本地偏好键前缀改为 marketlens. 并自动迁移旧的 finbot.*）
 
 更新：2026-10-24；状态：规格v0.4；当前阶段：eToro GOLD 数据源、交易记录、复盘均已接入。密钥配置、真实联调记录、个人交易记录与复盘结果只保存在本地 docs/private/LOCAL_NOTES.md（不入 Git）。
 
@@ -28,7 +28,9 @@
 
 公开与 GitHub Pages（2026-10-24）：仓库改为公开，历史重建为一个干净的提交；密钥配置、真实联调记录、个人交易记录与复盘结果移到本地 docs/private/LOCAL_NOTES.md（已 gitignore）；Pages 发布 web/，用模拟K线、模拟交易和 Binance 公开行情。同日改为全新的公开仓库 https://github.com/RedCarpG/marketlens-trading-analysis（Pages：https://redcarpg.github.io/marketlens-trading-analysis/），本地 origin 指向它；旧仓库 web-trading-MarketLens 不再使用，由用户自行删除。
 
-下一步候选：GC数据（eToro Micro Gold期货拼接连续合约或另找GC源）以后再议。
+首次使用默认（2026-10-24）：深色主题、图上不画价格行为情景；README 本地运行改为不提具体数据服务商。
+
+下一步候选：数据源可切换（eToro 只是其中一种；代理和设置里改成可选数据服务）。GC数据（eToro Micro Gold期货拼接连续合约或另找GC源）以后再议。
 
 已定（2026-10-22）：先用eToro GOLD（黄金CFD），GC期货数据源以后再议。
 待定：Binance适配器是否需要验证；v0.3中未写入项目说明的内容（手动ChatGPT分析包、经济日历与新闻、SQLite留痕）是否还要。DATA_VALIDATION.md仍按XAU/USD撰写，未更新。GitHub：当前仓库 https://github.com/RedCarpG/marketlens-trading-analysis（公开；2026-10-24 由 web-trading-MarketLens-app 改名；命名：全小写连字符，品牌名 + 用途；main），.env、server/node_modules、work/ 均未上传。

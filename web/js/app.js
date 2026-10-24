@@ -10,8 +10,9 @@ let chart,
   unsub,
   live = 0,
   scheme = LS.get('scheme', 'intl'),
-  theme = LS.get('theme', 'eye'),
-  MK = { hl: 1, sr: 1, ar: 1, pl: 1, tr: 1, ...LS.get('marks', {}) },
+  /* 第一次打开（本地没有保存过）时：深色主题；图上不画价格行为情景（面板里照常列出，可在“标注”菜单或情景块标题打开） */
+  theme = LS.get('theme', 'dark'),
+  MK = { hl: 1, sr: 1, ar: 1, pl: 0, tr: 1, ...LS.get('marks', {}) },
   /* PCOL：右侧面板收起成图标条；WCOL：左侧自选收起成竖窄条（都记在本地）；FOCUS：专注模式（只看K线，不记） */
   PCOL = LS.get('pnCol', 0),
   WCOL = LS.get('wlCol', 0),
@@ -49,7 +50,7 @@ const fmt = (k, ts) =>
         : { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }
   );
 function style() {
-  if (!PAL[theme]) theme = 'eye';
+  if (!PAL[theme]) theme = 'dark';
   const [g, r] = PAL[theme],
     U = scheme == 'cn' ? r : g,
     D = scheme == 'cn' ? g : r,
