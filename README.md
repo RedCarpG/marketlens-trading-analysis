@@ -2,7 +2,7 @@
 
 个人行情观察与分析工具：K线铺满整页，自上而下多周期分析（1M / 1w → 1d → 4h → 1h / 15m）、关键价位与前高前低、价格行为情景、价格预警、交易复盘。只读行情，不下单。
 
-**在线演示：** https://redcarpg.github.io/web-trading-MarketLens-app/
+**在线演示：** https://redcarpg.github.io/marketlens-trading-analysis/
 演示页使用模拟K线、模拟交易记录和 Binance 公开行情（比特币）；规则未经回测，不构成投资建议。
 
 ## 本地运行（含 eToro 行情与个人交易记录）

@@ -1,6 +1,6 @@
 # MarketLens — 个人行情观察与分析工具
 
-> 2026-10-24 项目由 FinBot 更名为 MarketLens；GitHub 仓库 RedCarpG/web-trading-MarketLens-app（公开，Pages：https://redcarpg.github.io/web-trading-MarketLens-app/；密钥配置、真实联调记录和个人交易记录只在本地 docs/private/，不入 Git）。下文提到的《FinBot-项目说明》为更名前的原始文档名。
+> 2026-10-24 项目由 FinBot 更名为 MarketLens；GitHub 仓库 RedCarpG/marketlens-trading-analysis（公开，Pages：https://redcarpg.github.io/marketlens-trading-analysis/；密钥配置、真实联调记录和个人交易记录只在本地 docs/private/，不入 Git）。下文提到的《FinBot-项目说明》为更名前的原始文档名。
 
 版本：0.4；日期：2026-10-22（Europe/Paris）。状态：第一版单文件前端已完成，真实数据源未联调。本文以用户在Claude网页对话中重写的《FinBot-项目说明》为准，取代 archive/ 内v0.1–v0.3；旧文件仅作历史，不作为并行规范。
 
