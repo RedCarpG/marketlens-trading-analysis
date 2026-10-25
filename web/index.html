@@ -113,10 +113,16 @@
           <div class="ms">
             <div class="mh">数据</div>
             <div class="mrow">
+              <span>数据源</span>
+              <div class="seg" id="srcs"></div>
+            </div>
+            <div class="mnote sm" id="srct"></div>
+            <div class="mrow">
               <span>本地数据</span
               ><label class="btn">导入 CSV<input type="file" id="csv" accept=".csv,.txt" hidden /></label>
             </div>
             <div class="mrow mstore"><span>本地K线存储</span><span id="storeinfo" class="sm"></span></div>
+            <div class="mrow mstore"><span>长周期历史</span><span id="histinfo" class="sm"></span></div>
           </div>
         </div>
       </div>
@@ -285,6 +291,7 @@
     <script src="js/core/scenarios.js"></script>
     <script src="js/core/review.js"></script>
     <script src="js/core/demo.js"></script>
+    <script src="js/core/backtest.js"></script>
     <script src="js/config.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/data.js"></script>
@@ -296,6 +303,7 @@
     <script src="js/chart-indicators.js"></script>
     <script src="js/panel.js"></script>
     <script src="js/review-ui.js"></script>
+    <script src="js/backtest-ui.js"></script>
     <script src="js/app.js"></script>
   </body>
 </html>

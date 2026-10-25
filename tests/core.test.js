@@ -118,6 +118,23 @@ test('scenarios 收紧选项：loose=0 去掉强阳收回；htf=1 只认大周�
   assert.equal(trig(twice, L('1d'), DEF).ago, 0);
   assert.equal(trig(twice, L('1d'), { ...DEF, cool: 10 }).ago, 3);
   assert.equal(trig(twice, L('1d'), { ...DEF, cool: 2 }).ago, 0);
+  /* 移动止损：3 根前触发后最高到 104（基础K线高点），回撤 2×ATR 2 = 100，高于初始止损 99.5 */
+  assert.equal(trig(twice, L('1d'), { ...DEF, cool: 10, trail: 2 }).trail, 100);
+  assert.equal(trig(twice, L('1d'), DEF).trail, undefined);
+});
+
+test('trendOf：均线、摆动结构、快均线三种方向判断', () => {
+  const trendOf = loadCore()('trendOf');
+  const pv = (h, l) => ({ hs: h.map(p => ({ p })), ls: l.map(p => ({ p })) });
+  const a = c => ({ c, e2: 100, e5: 95 });
+  assert.equal(trendOf('ema', [], a(101), pv([], [])), 1);
+  assert.equal(trendOf('ema', [], a(94), pv([], [])), 0); // EMA20 仍在 EMA50 上方但收盘跌破 EMA50：震荡
+  assert.equal(trendOf('struct', [], a(100), pv([100, 105], [90, 95])), 1); // 高点、低点都抬高
+  assert.equal(trendOf('struct', [], a(94), pv([100, 105], [90, 95])), 0); // 跌破最近低点
+  assert.equal(trendOf('struct', [], a(96), pv([105, 100], [95, 90])), -1);
+  assert.equal(trendOf('struct', [], a(96), pv([105], [95, 90])), 0); // 摆动点不足两个
+  const up = Array.from({ length: 30 }, (_, i) => ({ close: 90 + i }));
+  assert.equal(trendOf('fast', up, { c: 119, e2: 110 }, pv([], [])), 1);
 });
 
 test('analyze：不足 60 根返回 null', () => {

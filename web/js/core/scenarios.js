@@ -7,8 +7,10 @@
    收紧选项 opt（默认 SC_DEF；回测对比见 docs/BACKTEST.md 第 14 节：收紧后触发次数约少 6–8 倍，平均 R 没有变好也没有变差）：
    loose=0 不用“强阳/强阴收回”这类宽松形态；htf=1 只在大周期价位（代表价来自比入场周期更大的周期，如日线入场只用周线/月线的摆动点）；
    cool=N 冷却：同一价位同方向，前 N 根内已有符合条件的K线时，不再算新触发（仍显示原来那次）。
+   trail=N 另给出移动止损价：触发后最有利价回撤 N 个 ATR（按当前 ATR，不低于初始止损）。只作显示，不改变状态判断；
+   回测（第 15 节）里不设目标、2 ATR 移动止损比固定目标平均每笔多 0.1–0.5R。
    2026-10-25 之前的规则相当于 { loose: 1, htf: 0, cool: 0 }。 */
-const SC_DEF = { loose: 0, htf: 1, cool: 10 };
+const SC_DEF = { loose: 0, htf: 1, cool: 10, trail: 2 };
 function scenarios(T, t, L, now, opt = SC_DEF) {
   const rb = t.rb,
     n = rb.length,
@@ -89,6 +91,12 @@ function scenarios(T, t, L, now, opt = SC_DEF) {
         }
       }
       if (state == '已触发' && (dir > 0 ? now <= stop : now >= stop)) state = '失效（未收盘）';
+      let trail;
+      if (opt.trail) {
+        let best = entry;
+        for (let j = i + 1; j < n; j++) best = dir > 0 ? Math.max(best, rb[j].high) : Math.min(best, rb[j].low);
+        trail = dir > 0 ? Math.max(stop, best - opt.trail * x) : Math.min(stop, best + opt.trail * x);
+      }
       return {
         dir,
         kind,
@@ -102,6 +110,7 @@ function scenarios(T, t, L, now, opt = SC_DEF) {
         rr: Math.abs(tgt - entry) / risk,
         state,
         ago: n - 1 - i,
+        ...(trail != null && { trail }),
       };
     }
     return null;

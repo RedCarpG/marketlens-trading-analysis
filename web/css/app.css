@@ -237,6 +237,19 @@ button:disabled {
 .seg button.on {
   color: var(--ac);
 }
+/* 当前数据源没有的周期、不可用的数据服务 */
+.seg button.na,
+.seg button:disabled {
+  opacity: 0.38;
+}
+.seg button:disabled {
+  cursor: not-allowed;
+}
+.mnote {
+  margin: -2px 0 6px;
+  color: var(--mu);
+  line-height: 1.5;
+}
 
 /* 实时开关：圆点在开启时呼吸 */
 .live {
@@ -1850,8 +1863,9 @@ details[open]::details-content {
   background: var(--mu);
 }
 
-/* ===== 交易复盘面板：背景淡入、面板上浮 ===== */
-#rvm {
+/* ===== 交易复盘面板、回测面板：背景淡入、面板上浮 ===== */
+#rvm,
+#btm {
   position: fixed;
   inset: 0;
   z-index: 60;
@@ -1869,7 +1883,8 @@ details[open]::details-content {
     opacity 0.22s var(--ease),
     visibility 0s linear 0.22s;
 }
-#rvm.open {
+#rvm.open,
+#btm.open {
   opacity: 1;
   visibility: visible;
   transition-delay: 0s;
@@ -1885,7 +1900,8 @@ details[open]::details-content {
   transform: translateY(14px) scale(0.985);
   transition: transform 0.32s var(--ease);
 }
-#rvm.open .rvp {
+#rvm.open .rvp,
+#btm.open .rvp {
   transform: none;
 }
 .rvh {
@@ -2211,5 +2227,102 @@ button:active,
   }
   details::details-content {
     transition: none;
+  }
+}
+
+/* ===== 回测面板（backtest-ui.js）：选项行、进度条、资金曲线、明细表 ===== */
+.btos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 10px 0 4px;
+}
+.bto {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+/* 窄屏时选项按钮换行，面板不撑宽页面 */
+.bto .seg {
+  flex-wrap: wrap;
+}
+#btm {
+  overflow-x: hidden;
+}
+#btm .rvp {
+  min-width: 0;
+}
+#btm .rvh b {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.btprog {
+  height: 4px;
+  margin: 18px 0 8px;
+  border-radius: 2px;
+  background: var(--bg);
+  overflow: hidden;
+}
+.btprog i {
+  display: block;
+  height: 100%;
+  background: var(--ac);
+  transition: width 0.2s linear;
+}
+.bteq {
+  display: block;
+  width: 100%;
+  height: 150px;
+  margin-top: 4px;
+  border: 1px solid var(--bd);
+  border-radius: var(--rs);
+  background: var(--bg);
+}
+.bteq .z {
+  stroke: var(--bd);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.bteq .c {
+  stroke: var(--mu);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+  vector-effect: non-scaling-stroke;
+}
+.bteq .l {
+  fill: none;
+  stroke-width: 1.6;
+  vector-effect: non-scaling-stroke;
+}
+.bteql {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 4px 2px 0;
+}
+.btlist {
+  max-height: 320px;
+  overflow-y: auto;
+}
+.btlist tr[data-bt] {
+  cursor: pointer;
+}
+.btlist tr[data-bt]:hover td {
+  background: color-mix(in srgb, var(--ac) 8%, transparent);
+}
+@media (max-width: 760px) {
+  #btm {
+    padding: 16px 8px;
+  }
+  #btm .rvp {
+    padding: 14px 12px;
+  }
+  .rvg > div[style*='span 2'] {
+    grid-column: auto !important;
+  }
+  .bteql span:not(:nth-child(2)) {
+    display: none;
   }
 }

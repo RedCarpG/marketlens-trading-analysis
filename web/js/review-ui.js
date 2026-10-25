@@ -80,7 +80,7 @@ function renderReview() {
     .join('');
   $('#rvm').innerHTML = `<div class="rvp">
 <div class="rvh"><b>交易复盘 · ${RV.sym} · 近一年 ${sum.n} 笔已平仓${open ? `（另 ${open} 笔持仓不计入统计）` : ''}</b><button data-rv-close>✕</button></div>
-<div class="mu sm">只用开仓那一刻之前已收盘的K线，按与实时分析相同的规则重算当时的大周期方向、关键价位和情景；入场周期取 1h / 4h / 1d 中历史够用的最小一个。规则未经回测，只用来帮你反思交易习惯。</div>
+<div class="mu sm">只用开仓那一刻之前已收盘的K线，按与实时分析相同的规则重算当时的大周期方向、关键价位和情景；入场周期取 1h / 4h / 1d 中历史够用的最小一个。规则的初步回测未发现可靠优势（可在回测面板查看），只用来帮你反思交易习惯。</div>
 <div class="rvs"><div><span class="mu sm">胜率</span><b>${pct(sum.win, sum.n)}</b><span class="mu sm">${sum.win}/${sum.n}</span></div>
 <div><span class="mu sm">净盈亏</span><b style="color:${dc(sum.net)}">${sg(sum.net)}</b></div>
 <div><span class="mu sm">平均持仓　盈利单</span><b>${fmtHold(sum.holdWin)}</b><span class="mu sm">· 亏损单</span><b>${fmtHold(sum.holdLoss)}</b></div></div>

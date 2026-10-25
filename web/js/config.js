@@ -2,10 +2,25 @@
 const $ = s => document.querySelector(s);
 /* 是否经本地代理打开：eToro 行情、交易记录和K线存储都要通过本机代理（127.0.0.1），在其他地方（如 GitHub Pages、直接打开文件）不可用 */
 const LOCAL = /^(127\.0\.0\.1|localhost|\[::1\])$/.test(location.hostname) && location.protocol.startsWith('http');
-/* grp：左侧分组；新增品种时指定分组，GRPS 决定分组顺序 */
+/* grp：左侧分组；新增品种时指定分组，GRPS 决定分组顺序。
+   srcs：可切换的数据服务 → 该服务里的代码（src 为默认，设置里可改，按品种记在本地；服务说明见 data.js 的 SRCN） */
 const WL = [
-  { sym: 'GOLD', name: '黄金 GOLD · eToro', src: 'etoro', p: 2, grp: '黄金' },
-  { sym: 'BTCUSDT', name: '比特币 · Binance', src: 'binance', p: 2, grp: '加密货币' },
+  {
+    sym: 'GOLD',
+    name: '黄金 GOLD',
+    src: 'etoro',
+    srcs: { etoro: 'GOLD', yahoo: 'GC=F', history: 'gc' },
+    p: 2,
+    grp: '黄金',
+  },
+  {
+    sym: 'BTCUSDT',
+    name: '比特币 BTC',
+    src: 'binance',
+    srcs: { binance: 'BTCUSDT', history: 'btc' },
+    p: 2,
+    grp: '加密货币',
+  },
   { sym: 'GC', name: '黄金期货 GC', src: 'demo', p: 2, base: 2650, grp: '模拟' },
   { sym: 'AAPL', name: '苹果 AAPL', src: 'demo', p: 2, base: 230, grp: '模拟' },
   { sym: 'EURUSD', name: '欧元/美元', src: 'demo', p: 5, base: 1.08, grp: '模拟' },

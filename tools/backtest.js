@@ -18,10 +18,8 @@ const arg = (k, d) => {
 const get = loadCore();
 const [btRun, btReport, demoAll] = ['btRun', 'btReport', 'demoAll'].map(get);
 
-/* 成本预设（往返点差/手续费占入场价 %，隔夜费年化 %）。都是估计值，按自己的账户调整：
-   gold：eToro GOLD 实测 Ask−Bid 约 0.2–0.3 美元（金价 4000 时约 0.007%），取 0.01%；隔夜费按年化 5% 估（多空都收）
-   btc：Binance 现货吃单手续费 0.1%×2，不计隔夜（现货不能做空，做空一侧只作对照） */
-const COSTS = { none: {}, gold: { spreadPct: 0.01, carry: 5 }, btc: { spreadPct: 0.2, carry: 0 } };
+/* 成本预设与页面回测面板共用（web/js/core/backtest.js 的 BT_COSTS，都是估计值，按自己的账户调整） */
+const COSTS = { none: {}, ...JSON.parse(JSON.stringify(get('BT_COSTS'))) };
 /* --sc 文本 → 情景选项，如 "loose=0,htf=1,cool=10" */
 const parseSc = t =>
   t
@@ -193,7 +191,7 @@ function main() {
     f2(g.total),
     g.dd == null ? '—' : g.dd.toFixed(1),
     g.bars == null ? '—' : g.bars.toFixed(1),
-    `${g.target}/${g.stop}/${g.timeout}`,
+    `${g.target}/${g.stop + g.trail}/${g.timeout}`,
   ];
   const head = ['分组', '笔数', '胜率', '平均R', '盈亏比', '累计R', '最大回撤R', '平均持仓', '目标/止损/超时'];
   table(

@@ -1,21 +1,23 @@
 # MarketLens 本地代理
 
-托管 `web/` 下的页面（只允许 html/css/js），并转发 eToro 只读行情。只监听本机，只调用 market-data 接口，不接入下单或账户接口。
+托管 `web/` 下的页面（只允许 html/css/js），并提供可切换的只读行情数据服务：eToro（需密钥）、Yahoo Finance（无需密钥，非官方接口，期货约延迟 10 分钟）、本地长周期历史（`npm run import` 导入，var/history/）。只监听本机，只调用行情接口，不接入下单或账户接口。
 
 ## 启动
 
 1. 项目根目录复制 `.env.example` 为 `.env`，填写 eToro 的 `ETORO_API_KEY`、`ETORO_USER_KEY`（只读权限即可，不需要任何写权限）。
 2. 在 `server\` 下执行一次 `npm install`，之后 `npm start`。
-3. 浏览器打开 http://127.0.0.1:8787/ ，左侧选“黄金 GOLD · eToro”。
+3. 浏览器打开 http://127.0.0.1:8787/ ，左侧选“黄金 GOLD”；设置 → 数据源 可换成 Yahoo 或本地历史。
 
-不填密钥也能启动：模拟、CSV、Binance 照常可用，eToro 接口返回 503。
+不填密钥也能启动：模拟、CSV、Binance、Yahoo、本地历史照常可用，eToro 数据服务返回 503。
 
 ## 接口
 
 | 接口 | 说明 |
 |---|---|
-| `GET /api/etoro/candles?symbol=&interval=&count=` | 标准化K线数组（旧到新），`interval` 为 15m/1h/4h/1d/1w/1M，`count` 1–1000，默认 500 |
-| `WS /api/etoro/stream?symbol=&interval=` | 推送标准化单根K线，同一 timestamp 为更新当前K线；附带 `qt`（最后一笔报价的时间，毫秒），页面用来判断交易中 / 休市 |
+| `GET /api/sources` | 各数据服务是否可用（eToro 是否配置密钥）、已导入的本地历史数据集（名称、周期、根数、起止） |
+| `GET /api/candles?src=&symbol=&interval=&count=` | 标准化K线数组（旧到新）；`src` 为 etoro / yahoo / history，`interval` 为 15m/1h/4h/1d/1w/1M，`count` 1–8000，默认 500；Yahoo 代码如 `GC=F`（需 URL 编码），本地历史为数据集名称如 `gc` |
+| `WS /api/stream?src=&symbol=&interval=` | 推送标准化单根K线，同一 timestamp 为更新当前K线；附带 `qt`（最后一笔报价的时间，毫秒），页面用来判断交易中 / 休市。Yahoo 每 15 秒取一次最新价；本地历史没有实时 |
+| `GET /api/etoro/candles`、`WS /api/etoro/stream` | 旧路径，等同 `src=etoro` |
 | `GET /api/etoro/trades?symbol=&days=` | 我的已平仓交易（近 `days` 天，1–364，默认 364）；给了 symbol 只返回该品种 |
 | `GET /api/etoro/positions?symbol=` | 我的当前持仓（含浮动盈亏、止损止盈）；给了 symbol 只返回该品种 |
 | `GET /api/store` | 本地K线存储概况：每个品种/周期已存根数与起止时间 |

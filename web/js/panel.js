@@ -101,6 +101,7 @@ function anPanel(m) {
             .map(
               g => `<div><span style="color:${dc(g.dir)}">${g.dir > 0 ? '▲' : '▼'} ${g.kind}${g.dir > 0 ? '做多' : '做空'}</span><span class="tag">${g.state} · ${g.ago} 根前</span>${al(g.dir)}</div>
 <div class="row sm"><span>入场 / 止损 / 目标</span><b>${f(g.entry)} / ${f(g.stop)} / ${f(g.tgt)}</b></div>
+${g.trail != null && g.state == '已触发' ? `<div class="row sm"><span>移动止损（回撤 ${SC_DEF.trail} ATR）</span><b>${f(g.trail)}</b></div>` : ''}
 <div class="mu sm">触发K线：${g.shape}；目标依据 ${g.tl ? g.tl.tfs.join('·') + ' 价位' : '2 倍风险'}；盈亏比 1:${g.rr.toFixed(1)}（未计成本）</div>`
             )
             .join('')}
@@ -147,7 +148,7 @@ ${
 <div class="lbl" style="margin-top:10px">多周期结论</div><div class="chain">${ch}</div>
 </section>
 ${m.why.length ? blk('why', `评分说明 <span class="n">${m.why.length}</span>`, `<ul class="why">${m.why.map(w => `<li>${w}</li>`).join('')}</ul>`) : ''}
-${blk('sc', `价格行为情景 <span class="mu">${tf} · 纯K线</span>`, scn, chip('pl', '图上'))}
+${blk('sc', `价格行为情景 <span class="mu">${tf} · 纯K线</span>`, scn, chip('pl', '图上') + '<button class="chip" id="btgo" title="用当前品种的历史K线回测情景、信号和评分（B）">回测</button>')}
 ${blk('lv', `关键价位 <span class="mu">${tf} 及更大</span>`, keys, chip('hl', '前高前低') + chip('sr', '支撑阻力'))}
 ${blk('sg', `近期信号 <span class="n">${sigs.length}</span>`, sgl, chip('ar', '图上'))}
 ${blk('kv', `关键数值 <span class="mu">${tf}</span>`, `<div class="row"><span>RSI(14)</span><b>${a.rsi.toFixed(1)}</b></div><div class="row"><span>ATR(14)</span><b>${f(a.a)}</b></div>${a.hv ? '' : '<div class="row"><span>成交量</span><b class="mu">无（放量项不计分）</b></div>'}`)}
@@ -246,6 +247,7 @@ function initPanel() {
     if (q('[data-al-on]')) return setAlertsOn(!AL.on);
     if (q('#trr')) return loadTrades();
     if (q('#trv')) return openReview();
+    if (q('#btgo')) return openBacktest();
     if ((x = q('.sg[data-n]'))) return lastM && hlSig(lastM.t.a.sigs[+x.dataset.n]);
     if ((x = q('.lvr[data-lv]'))) return lastM && hlLevel(lastM.L.find(l => l.p == +x.dataset.lv));
     if ((x = q('.sc[data-sc]'))) return lastM && hlScene(lastM.sc[+x.dataset.sc]);

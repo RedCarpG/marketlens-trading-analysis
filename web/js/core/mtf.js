@@ -5,19 +5,39 @@ const MINB = { '1M': 60 },
   BT = { 1: '偏多', '-1': '偏空', 0: '震荡' };
 const MTF_W = { '1M': 3, '1w': 6, '1d': 5, '4h': 4, '1h': 3 }; // 大周期方向对评分的加减分，合计上限 ±15，权重待回测
 const closed = (tf, b) => (b.length && nxt(tf, b[b.length - 1].timestamp) > Date.now() ? b.slice(0, -1) : b);
-function ctx(tf, raw) {
+/* 各周期的方向（bias）判断方法，回测对比见 docs/BACKTEST.md 第 15 节：
+   ema    EMA20 在 EMA50 上方且收盘在 EMA50 上方为偏多（反之偏空），其余震荡
+   struct 摆动结构：最近两个摆动高点、低点都抬高且收盘未跌破最近低点为偏多；都降低且收盘未站上最近高点为偏空
+   fast   同 ema，换成 EMA10 / EMA20（转向更快） */
+const BIAS_DEF = 'ema';
+function trendOf(m, b, a, pv) {
+  if (m === 'struct') {
+    if (pv.hs.length < 2 || pv.ls.length < 2) return 0;
+    const [h1, h2] = pv.hs.slice(-2).map(q => q.p),
+      [l1, l2] = pv.ls.slice(-2).map(q => q.p);
+    return h2 > h1 && l2 > l1 && a.c > l2 ? 1 : h2 < h1 && l2 < l1 && a.c < h2 ? -1 : 0;
+  }
+  if (m === 'fast') {
+    const C = b.map(x => x.close),
+      e10 = ema(C, 10).at(-1);
+    return e10 > a.e2 && a.c > a.e2 ? 1 : e10 < a.e2 && a.c < a.e2 ? -1 : 0;
+  }
+  return a.e2 > a.e5 && a.c > a.e5 ? 1 : a.e2 < a.e5 && a.c < a.e5 ? -1 : 0;
+}
+function ctx(tf, raw, bm = BIAS_DEF) {
   const b = closed(tf, raw),
     a = analyze(b);
   if (!a) return { tf, n: b.length, a: null, ok: 0 };
   const L = b.slice(-50),
-    V = b.slice(-150);
+    V = b.slice(-150),
+    pv = pivots(b, 2, a.a);
   return {
     tf,
     n: b.length,
     a,
     ok: b.length >= (MINB[tf] || 100),
-    bias: a.e2 > a.e5 && a.c > a.e5 ? 1 : a.e2 < a.e5 && a.c < a.e5 ? -1 : 0,
-    pv: pivots(b, 2, a.a),
+    bias: trendOf(bm, b, a, pv),
+    pv,
     rb: V,
     hi50: Math.max(...L.map(x => x.high)),
     lo50: Math.min(...L.map(x => x.low)),

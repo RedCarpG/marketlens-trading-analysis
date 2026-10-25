@@ -3,7 +3,8 @@
    记录新出现的信号、当时的评分、新触发的情景；之后才用未来K线度量结果。规则只看 T 及更大的周期，所以只截取这些周期。
    from / to（时间戳，可选）只限定入场时间段：之前的K线照常用于预热，之后的K线照常用于结算。
    成本（每笔扣一次，换算成 R）：spread 点差（价格单位）、fee 隔夜费（价格单位/天）、spreadPct 往返点差与手续费（入场价的 %）、
-   carry 隔夜费年化（入场价的 %，按持仓自然日计）。sc：情景收紧选项（null = 页面默认 SC_DEF）。 */
+   carry 隔夜费年化（入场价的 %，按持仓自然日计）。sc：情景收紧选项（null = 页面默认 SC_DEF）。
+   bias：大周期方向的判断方法（null = 页面默认 BIAS_DEF，见 mtf.js）。exit：出场规则（null = 页面的止损/目标，见 btSim）。 */
 const BT_DEF = {
   tf: '1d',
   warm: 150,
@@ -18,7 +19,13 @@ const BT_DEF = {
   from: null,
   to: null,
   sc: null,
+  bias: null,
+  exit: null,
 };
+/* 成本预设（往返点差/手续费占入场价 %，隔夜费年化 %），都是估计值：
+   gold：eToro GOLD 实测 Ask−Bid 约 0.2–0.3 美元（金价 4000 时约 0.007%），取 0.01%；隔夜费按年化 5% 估（多空都收）
+   btc：Binance 现货吃单手续费 0.1%×2，不计隔夜 */
+const BT_COSTS = { gold: { spreadPct: 0.01, carry: 5 }, btc: { spreadPct: 0.2, carry: 0 } };
 
 /* 已收盘根数：bars 按时间升序，nxt(tf, ts) <= t 的根数（二分） */
 function btCount(bars, tf, t) {
@@ -44,6 +51,7 @@ function btRun(all, opts = {}) {
     trades = [],
     seen = new Set();
   for (let i = o.warm; i < B.length; i++) {
+    if (o.prog && i % 50 === 0) o.prog(i / B.length); // 进度回调（页面回测面板用）
     if (o.from != null && B[i].timestamp < o.from) continue;
     if (o.to != null && B[i].timestamp > o.to) break;
     const t = nxt(T, B[i].timestamp),
@@ -52,10 +60,11 @@ function btRun(all, opts = {}) {
       const bs = all[k],
         m = k === T ? i + 1 : btCount(bs, k, t);
       if (!m) continue;
-      if (k === T) Cx[k] = ctx(k, bs.slice(Math.max(0, m - o.win), m));
+      if (k === T) Cx[k] = ctx(k, bs.slice(Math.max(0, m - o.win), m), o.bias || undefined);
       else {
         const key = bs[m - 1].timestamp;
-        if (!cache[k] || cache[k].key !== key) cache[k] = { key, c: ctx(k, bs.slice(Math.max(0, m - o.win), m)) };
+        if (!cache[k] || cache[k].key !== key)
+          cache[k] = { key, c: ctx(k, bs.slice(Math.max(0, m - o.win), m), o.bias || undefined) };
         Cx[k] = cache[k].c;
       }
     }
@@ -99,26 +108,40 @@ function btRun(all, opts = {}) {
 }
 
 /* 模拟成交：入场 = 触发K线收盘；之后逐根检查。开盘就越过止损/目标 → 按开盘价成交；同一根K线内止损和目标都触及 → 按先止损（保守）；
-   超过 maxHold 根 → 按收盘价平仓；数据不够判断 → open（不计入统计）。R = （盈亏价差 − 点差 − 隔夜费 × 天数）÷ 初始风险 */
+   超过持仓上限 → 按收盘价平仓；数据不够判断 → open（不计入统计）。R = （盈亏价差 − 点差 − 隔夜费 × 天数）÷ 初始风险。
+   出场规则 o.exit（都可组合，null = 页面的止损/目标）：
+   tgtR 目标改为 N 倍初始风险（0 = 不设目标）；be 浮盈达到 N 倍风险后止损移到入场价；
+   trail 移动止损：入场后最有利价回撤 N 个 ATR（入场时的 ATR）；hold 持仓上限（根）。
+   保本和移动止损在一根K线收盘后才更新，从下一根起生效（不知道K线内高低点的先后）。 */
 function btSim(B, tr, o) {
   const d = tr.dir,
+    x = o.exit || {},
     risk = Math.abs(tr.entry - tr.stop),
     i = tr.i,
+    tgt = x.tgtR != null ? (x.tgtR > 0 ? tr.entry + d * x.tgtR * risk : d * Infinity) : tr.tgt,
+    hold = x.hold || o.maxHold,
     done = (px, res, j) => {
       const days = (B[j].timestamp - B[i].timestamp) / 864e5;
       const cost = o.spread + o.fee * days + (tr.entry * ((o.spreadPct || 0) + ((o.carry || 0) * days) / 365)) / 100;
       return { res, exitI: j, exitPx: px, bars: j - i, R: ((px - tr.entry) * d - cost) / risk };
     };
   if (!(risk > 0)) return { res: 'invalid' };
-  const last = Math.min(B.length - 1, i + o.maxHold);
+  const last = Math.min(B.length - 1, i + hold);
+  let stop = tr.stop,
+    best = tr.entry;
   for (let j = i + 1; j <= last; j++) {
-    const k = B[j];
-    if (d > 0 ? k.open <= tr.stop : k.open >= tr.stop) return done(k.open, 'stop', j);
-    if (d > 0 ? k.open >= tr.tgt : k.open <= tr.tgt) return done(k.open, 'target', j);
-    if (d > 0 ? k.low <= tr.stop : k.high >= tr.stop) return done(tr.stop, 'stop', j);
-    if (d > 0 ? k.high >= tr.tgt : k.low <= tr.tgt) return done(tr.tgt, 'target', j);
+    const k = B[j],
+      moved = stop !== tr.stop;
+    if (d > 0 ? k.open <= stop : k.open >= stop) return done(k.open, moved ? 'trail' : 'stop', j);
+    if (d > 0 ? k.open >= tgt : k.open <= tgt) return done(k.open, 'target', j);
+    if (d > 0 ? k.low <= stop : k.high >= stop) return done(stop, moved ? 'trail' : 'stop', j);
+    if (d > 0 ? k.high >= tgt : k.low <= tgt) return done(tgt, 'target', j);
+    best = d > 0 ? Math.max(best, k.high) : Math.min(best, k.low);
+    if (x.be && (best - tr.entry) * d >= x.be * risk)
+      stop = d > 0 ? Math.max(stop, tr.entry) : Math.min(stop, tr.entry);
+    if (x.trail) stop = d > 0 ? Math.max(stop, best - x.trail * tr.atr) : Math.min(stop, best + x.trail * tr.atr);
   }
-  if (i + o.maxHold <= B.length - 1) return done(B[i + o.maxHold].close, 'timeout', i + o.maxHold);
+  if (i + hold <= B.length - 1) return done(B[i + hold].close, 'timeout', i + hold);
   return { res: 'open' };
 }
 
@@ -213,6 +236,7 @@ function btTrades(ts) {
     target: by('target'),
     stop: by('stop'),
     timeout: by('timeout'),
+    trail: by('trail'),
     open: ts.length - c.length,
     thin: c.length < 30,
   };
@@ -317,6 +341,22 @@ function btReport(all, run) {
       ...t.out,
     })),
   };
+  /* 大周期方向：按 want（多周期结论给出的方向）持有 20 根的收益（ATR），与同期每根都做多相比；
+     edge = 方向日的 收益×方向 均值 − 同样这些天 漂移×方向（扣掉“牛市里做多本来就赚”的部分） */
+  const f20 = s => (btFwd(B, s.i, 20, 1, s.atr) || {}).r,
+    st20 = run.steps.filter(s => f20(s) != null),
+    up = st20.filter(s => s.want > 0),
+    dn = st20.filter(s => s.want < 0),
+    drift = mstat(st20.map(f20)).mean,
+    dirs = up.concat(dn),
+    trend = {
+      n: st20.length,
+      up: mstat(up.map(f20)),
+      dn: mstat(dn.map(s => -f20(s))),
+      flat: st20.length - dirs.length,
+      drift,
+      edge: dirs.length ? mstat(dirs.map(s => (f20(s) - drift) * s.want)) : { n: 0 },
+    };
   /* 同期涨跌：回放区间第一根到最后一根（设了 to 时不含区间之后用于结算的K线） */
   const first = B[run.steps.length ? run.steps[0].i : 0],
     lastB = B[run.steps.length ? run.steps[run.steps.length - 1].i : B.length - 1];
@@ -328,10 +368,38 @@ function btReport(all, run) {
     cut,
     steps: run.steps.length,
     sceDays: new Set(run.trades.map(t => t.i)).size,
+    trend,
     hold: first && lastB ? (lastB.close / first.close - 1) * 100 : null,
     base,
     sig,
     score: sc,
     sce,
+  };
+}
+
+/* 页面回测面板（web/js/backtest-ui.js，经 bt-worker.js 在后台线程跑）：回放一次，按无成本与有成本各统计一次，
+   返回能在线程间传递的精简结果（去掉函数和逐根记录，交易附出场时间） */
+function btPage({ all, opts, cost }, prog) {
+  const run = btRun(all, { ...opts, prog });
+  delete run.opts.prog;
+  const B = all[run.opts.tf],
+    gross = btReport(all, run).sce.all.all,
+    rep = btReport(all, cost ? { ...run, opts: { ...run.opts, ...cost } } : run),
+    { list, ...sce } = rep.sce;
+  return {
+    tf: run.opts.tf,
+    from: rep.from,
+    to: rep.to,
+    cut: rep.cut,
+    steps: rep.steps,
+    hold: rep.hold,
+    days: rep.sceDays,
+    gross,
+    sce,
+    sig: rep.sig,
+    base5: rep.base[5] ? rep.base[5].all.up.mean : null,
+    score: rep.score,
+    trend: rep.trend,
+    list: list.map(t => ({ ...t, exitTs: t.exitI != null ? B[t.exitI].timestamp : null })),
   };
 }

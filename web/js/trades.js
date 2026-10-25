@@ -1,6 +1,7 @@
 /* 我的交易：拉取、时间对齐、右侧面板 */
 /* ===== 我的交易：eToro 品种为真实交易记录（经本地代理只读拉取，近 364 天已平仓与当前持仓）；
-   模拟品种和 Binance 用模拟交易（simTrades，按K线确定性生成，标明“模拟”），公开页面上也能体验交易页、图上交易、复盘；CSV 不显示 ===== */
+   不论当前用哪个数据服务看价格，只要品种有 eToro 代码就取真实交易（价格口径可能与图上略有差异）；
+   模拟品种和比特币用模拟交易（simTrades，按K线确定性生成，标明“模拟”），公开页面上也能体验交易页、图上交易、复盘；CSV 不显示 ===== */
 /* TRL：正在拉取（“刷新”按钮转圈） */
 let TR = null,
   TRL = 0;
@@ -10,12 +11,13 @@ async function loadTrades() {
     TR = null;
     return;
   }
-  if (cur.src != 'etoro') {
+  if (!(LOCAL && cur.srcs && cur.srcs.etoro)) {
     TR = simTrades(cur);
     if (bars.length) refresh();
     return;
   }
   const sym = cur.sym,
+    esym = cur.srcs.etoro,
     t = { sym, closed: [], open: [], err: null, at: Date.now() };
   TRL = 1;
   if (bars.length) refresh();
@@ -27,8 +29,8 @@ async function loadTrades() {
   };
   try {
     [t.closed, t.open] = await Promise.all([
-      get(`/api/etoro/trades?symbol=${sym}&days=364`),
-      get(`/api/etoro/positions?symbol=${sym}`),
+      get(`/api/etoro/trades?symbol=${esym}&days=364`),
+      get(`/api/etoro/positions?symbol=${esym}`),
     ]);
   } catch (e) {
     t.err = e.message;

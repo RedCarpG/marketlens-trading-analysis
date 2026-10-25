@@ -17,6 +17,8 @@ let chart,
   PCOL = LS.get('pnCol', 0),
   WCOL = LS.get('wlCol', 0),
   FOCUS = 0,
+  /* 各数据服务是否可用（本地代理 /api/sources），设置里的数据源按钮据此置灰 */
+  SRCOK = null,
   on = {},
   volPref = 1,
   seen = new Set();
@@ -145,8 +147,14 @@ async function load() {
       if (rs[i].status == 'fulfilled' && v && v.length) ALL[k] = v;
     });
   }
+  /* 数据服务没有当前周期（如本地历史只有日/周/月线）：换到日线，没有日线就换到第一个有的周期 */
+  if (!ALL[tf] && Object.keys(ALL).length) setTfBtn(ALL['1d'] ? '1d' : TFS.find(k => ALL[k]));
   if (!ALL[tf]) {
-    stMsg('无法连接实时接口：需在本地或自有服务器运行（预览页面禁止访问外部接口）');
+    stMsg(
+      PROXY.has(cur.src)
+        ? `${SRCN[cur.src]} 取不到数据：检查本地代理是否在运行、该数据服务是否可用（设置 → 数据源）`
+        : '无法连接实时接口：需在本地或自有服务器运行（预览页面禁止访问外部接口）'
+    );
     morph($('#mx'), '');
     return;
   }
@@ -154,8 +162,18 @@ async function load() {
   show();
   loadTrades();
 }
+/* 只切换周期按钮的选中状态（不重新加载） */
+function setTfBtn(k) {
+  tf = k;
+  document.querySelectorAll('#tfs button').forEach(b => b.classList.toggle('on', b.dataset.f == k));
+  segInd($('#tfs'));
+}
 function show() {
   bars = ALL[tf];
+  /* 当前数据服务没有的周期按钮变淡 */
+  document
+    .querySelectorAll('#tfs button')
+    .forEach(b => b.classList.toggle('na', cur.src != 'csv' && !ALL[b.dataset.f]));
   clearHl();
   hideHover();
   volAvail(hasVol(bars));
@@ -194,8 +212,7 @@ function hdr() {
     px = st.querySelector('.px'),
     c = st.querySelector('.chg'),
     sg = chg >= 0 ? '+' : '';
-  st.querySelector('.src').textContent =
-    cur.src == 'demo' ? '模拟数据' : cur.src == 'csv' ? '本地 CSV' : cur.name.split(' · ')[1] || '';
+  st.querySelector('.src').textContent = cur.src == 'demo' ? '模拟数据' : SRCN[cur.src] || '';
   px.textContent = f(b.close);
   c.textContent = p ? `${sg}${f(chg)}  ${sg}${((chg / p.close) * 100).toFixed(2)}%` : '';
   c.style.color = chg > 0 ? 'var(--up)' : chg < 0 ? 'var(--dn)' : 'var(--mu)';
@@ -236,20 +253,30 @@ function mktPill() {
   let k, txt, tip;
   if (cur.src == 'demo') [k, txt, tip] = ['dim', '模拟数据', '随机模拟行情，仅用于演示'];
   else if (cur.src == 'csv') [k, txt, tip] = ['dim', '本地 CSV', '导入的历史数据，不是实时行情'];
+  else if (cur.src == 'history') [k, txt, tip] = ['dim', '本地历史', '导入的长周期历史（日/周/月线），不是实时行情'];
   else if (live && unsub) {
+    /* Yahoo 期货报价本身约延迟 10 分钟，判断休市的间隔放宽到 20 分钟 */
+    const lag = cur.src == 'yahoo' ? 20 * 60e3 : 120e3;
     if (liveQ == null)
       [k, txt, tip] =
         now - liveAt > 15e3
           ? ['off', '暂无报价', '已连接实时行情，但还没收到报价']
           : ['wait', '连接中…', '正在连接实时行情'];
-    else if (now - liveQ < 120e3)
+    else if (now - liveQ < lag)
       [k, txt, tip] = [
         'on',
-        '实时 · 交易中',
-        '最后报价 ' + new Date(liveQ).toLocaleTimeString('zh-CN', { hour12: false }),
+        cur.src == 'yahoo' ? '延迟行情 · 交易中' : '实时 · 交易中',
+        '最后报价 ' +
+          new Date(liveQ).toLocaleTimeString('zh-CN', { hour12: false }) +
+          (cur.src == 'yahoo' ? '（Yahoo 期货报价约延迟 10 分钟）' : ''),
       ];
-    else [k, txt, tip] = ['closed', '休市 · 最后报价 ' + t(liveQ), '超过 2 分钟没有新报价：市场休市或报价暂停'];
-  } else if (cur.src != 'binance' && lastEnd && now - lastEnd > 30 * 60e3)
+    else
+      [k, txt, tip] = [
+        'closed',
+        '休市 · 最后报价 ' + t(liveQ),
+        `超过 ${lag / 60e3} 分钟没有新报价：市场休市或报价暂停`,
+      ];
+  } else if (cur.src != 'binance' && lastEnd && now - lastEnd > (cur.src == 'yahoo' ? 45 : 30) * 60e3)
     [k, txt, tip] = [
       'closed',
       '休市 · 最后K线 ' + t(lastEnd),
@@ -263,9 +290,12 @@ function mktPill() {
 setInterval(mktPill, 1000);
 function setTf(k) {
   if (!k || (k == tf && ALL[k])) return;
-  tf = k;
-  document.querySelectorAll('#tfs button').forEach(b => b.classList.toggle('on', b.dataset.f == k));
-  segInd($('#tfs'));
+  if (cur.src != 'csv' && bars.length && !ALL[k]) {
+    stMsg(`${SRCN[cur.src] || '当前数据源'}没有 ${k} 周期`);
+    setTimeout(() => ($('#note').hidden = true), 2500);
+    return;
+  }
+  setTfBtn(k);
   stop();
   ALL[k] ? show() : load();
 }
@@ -274,22 +304,23 @@ function setTf(k) {
 function wl() {
   $('#symb').textContent = cur.name.split(' · ')[0];
   $('#wls').textContent = cur.sym;
+  srcUI();
   const gs = [...new Set(WL.map(w => w.grp))].sort(
     (a, b) => ((GRPS.indexOf(a) + 99) % 99) - ((GRPS.indexOf(b) + 99) % 99)
   );
-  /* 不经本地代理打开（如 GitHub Pages）时不列 eToro 品种 */
+  /* 不经本地代理打开（如 GitHub Pages）时不列只能经代理取数的品种 */
+  const vis = w => LOCAL || !PROXY.has(w.src);
   $('#wl').innerHTML = gs
-    .filter(g => WL.some(w => w.grp == g && (LOCAL || w.src != 'etoro')))
+    .filter(g => WL.some(w => w.grp == g && vis(w)))
     .map(
       g =>
         `<div class="mh">${g}</div>` +
         WL.map((w, i) => [w, i])
-          .filter(([w]) => w.grp == g && (LOCAL || w.src != 'etoro'))
-          .map(([w, i]) => {
-            const [nm, src] = w.name.split(' · ');
-            const off = w.src == 'etoro' && !LOCAL;
-            return `<button class="wi${w == cur ? ' on' : ''}" data-k="${i}" title="${off ? '需在本机运行代理（server 目录 npm start）后从 127.0.0.1 打开' : w.name}"><span>${nm}</span><i>${w.src == 'demo' ? '模拟' : w.src == 'csv' ? '本地' : off ? '需本地代理' : src || '实时'}</i></button>`;
-          })
+          .filter(([w]) => w.grp == g && vis(w))
+          .map(
+            ([w, i]) =>
+              `<button class="wi${w == cur ? ' on' : ''}" data-k="${i}" title="${w.name} · 数据：${SRCN[w.src]}${w.srcs ? '（设置里可换数据源）' : ''}"><span>${w.name}</span><i>${w.src == 'csv' ? '本地' : SRCN[w.src]}</i></button>`
+          )
           .join('')
     )
     .join('');
@@ -423,8 +454,18 @@ function init() {
   document.addEventListener('click', e => {
     if (!e.target.closest('.dd')) document.querySelectorAll('.dd.open').forEach(x => x.classList.remove('open'));
   });
-  /* 打开设置时刷新“本地K线存储”的概况 */
+  /* 打开设置时刷新“本地K线存储”、长周期历史的概况和各数据服务是否可用 */
   $('#setd .ddb').addEventListener('click', loadStoreInfo);
+  $('#setd .ddb').addEventListener('click', loadSources);
+  /* 数据源：切换后记在本地（按品种），重新加载 */
+  $('#srcs').onclick = e => {
+    const b = e.target.closest('[data-src]');
+    if (!b || b.disabled || b.dataset.src == cur.src) return;
+    cur.src = b.dataset.src;
+    LS.set('src.' + cur.sym, cur.src);
+    wl();
+    load();
+  };
   /* 图表尺寸随容器变化自动适配（之后副图位置会变，重排图例）；顶栏换行时高度变化，重新布局 */
   new ResizeObserver(() => {
     chart.resize();
@@ -493,19 +534,21 @@ function init() {
   $('#tfs').onclick = e => setTf(e.target.dataset.f);
   segInd($('#tfs'));
   /* 选中项：点文字重新定位到选中的K线，✕ 取消。
-     快捷键：Esc 依次关菜单 → （复盘面板开着时由面板自己处理）→ 取消选中 → 退出专注模式；[ 开合左侧自选；] 开合右侧面板；F 专注模式 */
+     快捷键：Esc 依次关菜单 → （复盘/回测面板开着时由面板自己处理）→ 取消选中 → 退出专注模式；[ 开合左侧自选；] 开合右侧面板；F 专注模式；B 回测 */
   $('#selp .selt').onclick = () => hlLoc && hlLoc();
   $('#selp .selx').onclick = clearHl;
   document.addEventListener('keydown', e => {
     if (e.ctrlKey || e.metaKey || e.altKey || (e.target.closest && e.target.closest('input,textarea,select'))) return;
     if (e.key == 'Escape') {
       if ($('.dd.open')) return document.querySelectorAll('.dd.open').forEach(x => x.classList.remove('open'));
-      if ($('#rvm.open')) return;
+      if ($('#rvm.open') || $('#btm.open')) return;
       if (hlSel) return clearHl();
       if (FOCUS) setFocus(0);
       return;
     }
-    if ($('#rvm.open') || !WIDE()) return;
+    if ($('#rvm.open') || $('#btm.open')) return;
+    if (e.key == 'b' || e.key == 'B') return openBacktest();
+    if (!WIDE()) return;
     if (e.key == '[') setWcol(!WCOL);
     else if (e.key == ']') setPcol(!PCOL);
     else if (e.key == 'f' || e.key == 'F') setFocus(!FOCUS);
@@ -628,8 +671,58 @@ function init() {
   initPanel();
   wl();
   load();
+  loadSources();
 }
 init();
+
+/* ===== 数据源（设置菜单）：当前品种可切换的数据服务；可用性来自本地代理 /api/sources ===== */
+async function loadSources() {
+  if (!LOCAL) return;
+  try {
+    SRCOK = await (await fetch('/api/sources')).json();
+  } catch {
+    SRCOK = null;
+  }
+  srcUI();
+  const sets = (SRCOK && SRCOK.history.sets) || [];
+  $('#histinfo').innerHTML = sets.length
+    ? sets
+        .map(
+          s =>
+            `<div>${s.name}：${s.count.toLocaleString()} 根日线 <span class="mu">${fmt('1d', s.from)} → ${fmt('1d', s.to)}</span></div>`
+        )
+        .join('')
+    : '暂无（npm run import 导入）';
+}
+/* 不可用的服务按钮置灰，悬停显示原因 */
+function srcUI() {
+  const el = $('#srcs'),
+    t = $('#srct');
+  if (!cur.srcs) {
+    el.innerHTML = `<button class="on" disabled>${SRCN[cur.src] || '—'}</button>`;
+    segInd(el);
+    t.textContent = cur.src == 'demo' ? '模拟品种只有模拟数据' : cur.src == 'csv' ? '导入的 CSV 数据' : '';
+    return;
+  }
+  const why = s =>
+    !LOCAL && PROXY.has(s)
+      ? '需经本地代理（127.0.0.1）打开'
+      : !SRCOK
+        ? ''
+        : s == 'etoro' && !SRCOK.etoro.ok
+          ? '未配置 eToro 密钥（.env）'
+          : s == 'history' && !SRCOK.history.sets.some(x => x.name == cur.srcs.history)
+            ? `未导入：npm run import -- --source … --name ${cur.srcs.history}`
+            : '';
+  el.innerHTML = Object.keys(cur.srcs)
+    .map(s => {
+      const w = why(s);
+      return `<button data-src="${s}" class="${s == cur.src ? 'on' : ''}"${w ? ' disabled' : ''} title="${w || SRCT[s]}">${SRCN[s]}</button>`;
+    })
+    .join('');
+  segInd(el);
+  t.textContent = SRCT[cur.src] || '';
+}
 
 /* 设置菜单里的“本地K线存储”：代理把每次拉到的 eToro K线存在本机，这里列出各周期已积累的根数和起始时间 */
 async function loadStoreInfo() {

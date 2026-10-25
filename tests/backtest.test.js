@@ -5,7 +5,7 @@ const { loadCore } = require('./load-core');
 
 const NOW = Date.UTC(2026, 9, 23, 13, 7, 0);
 const get = loadCore(NOW);
-const [btRun, btReport, btSim, btCount, wilson, spearman, bkt, nxt, demoAll] = [
+const [btRun, btReport, btSim, btCount, wilson, spearman, bkt, nxt, demoAll, btPage] = [
   'btRun',
   'btReport',
   'btSim',
@@ -15,6 +15,7 @@ const [btRun, btReport, btSim, btCount, wilson, spearman, bkt, nxt, demoAll] = [
   'bkt',
   'nxt',
   'demoAll',
+  'btPage',
 ].map(get);
 const plain = x => JSON.parse(JSON.stringify(x));
 
@@ -121,6 +122,45 @@ test('模拟成交：同一根K线止损和目标都触及按先止损；跳空�
   const sh = btSim([B0, bar(99, 101, 89, 90, 1)], { i: 0, dir: -1, entry: 100, stop: 105, tgt: 90 }, o);
   assert.equal(sh.res, 'target');
   assert.equal(sh.R, 2);
+});
+
+test('出场规则：目标改为 N 倍风险、浮盈 1R 后保本、移动止损、持仓上限；保本和移动止损从下一根起生效', () => {
+  const bar = (o, h, l, c, d) => ({ timestamp: Date.UTC(2026, 0, 1 + d), open: o, high: h, low: l, close: c });
+  const o = { maxHold: 50, spread: 0, fee: 0 },
+    tr = { i: 0, dir: 1, entry: 100, stop: 95, tgt: 110, atr: 2 },
+    B0 = bar(98, 101, 97, 100, 0);
+  const t1 = btSim([B0, bar(101, 105.5, 99, 104, 1)], tr, { ...o, exit: { tgtR: 1 } });
+  assert.equal(t1.res, 'target');
+  assert.equal(t1.R, 1);
+  const be = btSim([B0, bar(101, 106, 99, 104, 1), bar(101, 102, 99.5, 101, 2)], tr, { ...o, exit: { be: 1 } });
+  assert.equal(be.res, 'trail'); // 第 1 根浮盈过 1R（且当根低点 99 未到 100），第 2 根回到入场价出场
+  assert.equal(be.R, 0);
+  const tl = btSim([B0, bar(101, 110, 101, 109, 1), bar(108, 108, 105, 106, 2)], tr, {
+    ...o,
+    exit: { tgtR: 0, trail: 2 },
+  });
+  assert.equal(tl.res, 'trail'); // 最高 110 − 2×ATR 2 = 106
+  assert.ok(Math.abs(tl.R - 1.2) < 1e-9);
+  const hd = btSim([B0, bar(100, 102, 98, 101, 1), bar(101, 103, 99, 102, 2)], tr, {
+    ...o,
+    exit: { tgtR: 0, hold: 2 },
+  });
+  assert.equal(hd.res, 'timeout');
+  assert.ok(Math.abs(hd.R - 0.4) < 1e-9);
+});
+
+test('btPage（页面回测面板）：结果能在线程间传递（不含函数），与 btReport 一致，交易附出场时间', () => {
+  const all = demoAll({ sym: 'GC', base: 2650 }),
+    cost = get('BT_COSTS').gold,
+    r = btPage({ all, opts: { tf: '1d' }, cost }, () => {}),
+    run = btRun(all, { tf: '1d' }),
+    rep = btReport(all, { ...run, opts: { ...run.opts, ...cost } });
+  assert.doesNotThrow(() => structuredClone(r));
+  assert.equal(r.sce.all.all.n, rep.sce.all.all.n);
+  assert.ok(Math.abs(r.sce.all.all.mean - rep.sce.all.all.mean) < 1e-12);
+  assert.ok(r.gross.mean > r.sce.all.all.mean); // 计入成本后更低
+  const t = r.list.find(x => x.exitI != null);
+  assert.equal(t.exitTs, all['1d'][t.exitI].timestamp);
 });
 
 test('统计：Wilson 区间与秩相关', () => {
