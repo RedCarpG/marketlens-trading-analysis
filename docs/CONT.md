@@ -2,7 +2,7 @@
 
 （2026-10-24 由 FinBot 更名为 MarketLens；本地目录同日改为 X:\Project\MarketLens，浏览器本地偏好键前缀改为 marketlens. 并自动迁移旧的 finbot.*）
 
-更新：2026-10-24；状态：规格v0.4；当前阶段：eToro GOLD 数据源、交易记录、复盘均已接入。密钥配置、真实联调记录、个人交易记录与复盘结果只保存在本地 docs/private/LOCAL_NOTES.md（不入 Git）。
+更新：2026-10-25；状态：规格v0.4；当前阶段：eToro GOLD 数据源、交易记录、复盘、经济日历与新闻均已接入。密钥配置、真实联调记录、个人交易记录与复盘结果只保存在本地 docs/private/LOCAL_NOTES.md（不入 Git）。
 
 目标：个人行情观察与分析工具，以黄金期货GC为主，KLineChart图表，规则评分与参考计划，后续加预警与回测；只读行情，不下单。分析方法为自上而下多周期：1M/1w定背景→1d结构→4h区域→1h/15m触发（SPEC 3.5节）；页面已实现1w/1M、analyzeMTF与周期状态矩阵初版（仅模拟数据验证，权重未回测）。
 
@@ -44,10 +44,12 @@
 - 数据源可切换：代理统一为 `/api/sources`、`/api/candles?src=`、`/api/stream?src=`，新增 Yahoo（免费、期货延迟约 10 分钟）和本地长周期历史；设置 → 数据源按品种切换；真实交易跟着品种走。
 - 页面回测面板（第 17 节）：情景标题“回测”按钮 / 快捷键 B，后台线程回放当前数据，可切换规则、出场、大周期方法和成本，点明细在图上查看。
 
-下一步候选：情景入场条件仍无优势，不再细调；数据源可切换（eToro 只是其中一种；代理和设置里改成可选数据服务）。GC数据（eToro Micro Gold期货拼接连续合约或另找GC源）以后再议。
+经济日历与新闻（2026-10-25）：按用户要求加入获取时事的能力。代理新增 server/events.js 与 /api/events/calendar、/api/events/news：Forex Factory 本周日历（预期 / 前值）与 BLS 发布日程、内置 FOMC 日程（至 2028-01）核对合并；BLS 公共 API 给出非农、失业率、时薪、CPI 最新值；新闻为 Google 新闻 RSS（主题 × 中文 / EN）+ 美联储新闻稿，可在 .env 的 NEWS_FEEDS 追加。全部免费、无需密钥，日历存 var/events。页面新增“事件”页（来源状态、下一个重要事件倒计时、官方数据、经济日历、新闻）、分析页评分卡的事件提示、图上“经济事件”标注与悬停、预警“重要经济事件”（公布前 30 / 5 分钟，BLS 公布新数时）。不经代理打开时写“未覆盖”。事件不参与评分与情景。开发环境网络访问不到这些站点，未经真实联调：解析按公开格式写、用样例测试（tests/events.test.js），页面用模拟上游在浏览器里检查过；第一次本机运行时看“事件”页顶部的来源状态，BLS 403 时设 EVENTS_UA。详见 SPEC 3.3.10、server/README.md。
+
+下一步候选：情景入场条件仍无优势，不再细调；经济日历与新闻首次本机运行时核对来源状态；GC数据（eToro Micro Gold期货拼接连续合约或另找GC源）以后再议。
 
 已定（2026-10-22）：先用eToro GOLD（黄金CFD），GC期货数据源以后再议。
-待定：Binance适配器是否需要验证；v0.3中未写入项目说明的内容（手动ChatGPT分析包、经济日历与新闻、SQLite留痕）是否还要。DATA_VALIDATION.md仍按XAU/USD撰写，未更新。GitHub：当前仓库 https://github.com/RedCarpG/marketlens-trading-analysis（公开；2026-10-24 由 web-trading-MarketLens-app 改名；命名：全小写连字符，品牌名 + 用途；main），.env、server/node_modules、work/ 均未上传。
+待定：Binance适配器是否需要验证；v0.3中未写入项目说明的内容（手动ChatGPT分析包、SQLite留痕）是否还要；经济日历与新闻在本机首次运行时的真实联调。DATA_VALIDATION.md仍按XAU/USD撰写，未更新。GitHub：当前仓库 https://github.com/RedCarpG/marketlens-trading-analysis（公开；2026-10-24 由 web-trading-MarketLens-app 改名；命名：全小写连字符，品牌名 + 用途；main），.env、server/node_modules、work/ 均未上传。
 
 环境：Node v18.14.0（已停止维护，代理可运行，建议升级）、Python 3.10.1、Git 2.35.1、Docker 26.0.0。
 

@@ -1,5 +1,5 @@
 /* 周期矩阵与右侧面板 */
-/* 右侧面板分三个标签页：分析 / 交易（仅 eToro 品种）/ 预警。每次刷新（实时约 300ms 一次）三页都重新生成 HTML，
+/* 右侧面板分四个标签页：分析 / 交易 / 事件（经济日历与新闻，见 events.js）/ 预警。每次刷新（实时约 300ms 一次）各页都重新生成 HTML，
    由 morph 只更新变化的部分（过渡动画、悬停、滚动位置都不受影响）；点击、勾选、块开合在 #pn 上统一委托处理 */
 function matrix() {
   const el = $('#mx');
@@ -68,6 +68,7 @@ function refresh() {
       });
   morph(pane('an'), m ? anPanel(m) : '<div class="empty">已收盘K线不足 60 根，无法分析</div>');
   if (hasTr()) morph(pane('tr'), trPanel());
+  morph(pane('ev'), evPanel());
   morph(pane('al'), alPanel());
   tabBadges();
   legend();
@@ -146,6 +147,7 @@ ${
 <div class="meter"><i style="left:${m.s}%"></i></div>
 <div class="mu sm">本周期 ${a.s}，大周期方向 ${m.adj >= 0 ? '+' : ''}${m.adj}</div>
 <div class="lbl" style="margin-top:10px">多周期结论</div><div class="chain">${ch}</div>
+${evRisk()}
 </section>
 ${m.why.length ? blk('why', `评分说明 <span class="n">${m.why.length}</span>`, `<ul class="why">${m.why.map(w => `<li>${w}</li>`).join('')}</ul>`) : ''}
 ${blk('sc', `价格行为情景 <span class="mu">${tf} · 纯K线</span>`, scn, chip('pl', '图上') + '<button class="chip" id="btgo" title="用当前品种的历史K线回测情景、信号和评分（B）">回测</button>')}
@@ -175,8 +177,8 @@ function alPanel() {
         .join('') || '<div class="empty">暂无</div>';
   return `<div class="alh"><div><b>价格预警</b><div class="mu sm">${AL.on ? `<span class="lvd"></span>监控中 · ${cur.sym} · ${tf}` : '未开启'}</div></div>
 <button class="swb${AL.on ? ' on' : ''}" data-al-on role="switch" aria-checked="${!!AL.on}" title="${AL.on ? '关闭预警' : '开启预警'}"></button></div>
-<div class="opts">${opt('lv', '到达关键价位', '价格进入关键价位 ±0.15 ATR')}${opt('sc', '情景触发 / 失效', '价格行为情景状态变化')}${opt('sl', '接近我的止损 / 止盈', '距离 0.5 ATR 以内（eToro 持仓）')}</div>
-<div class="note2">只监控当前品种和周期，需保持页面打开；开启后自动连接实时行情。${np}。</div>
+<div class="opts">${opt('lv', '到达关键价位', '价格进入关键价位 ±0.15 ATR')}${opt('sc', '情景触发 / 失效', '价格行为情景状态变化')}${opt('sl', '接近我的止损 / 止盈', '距离 0.5 ATR 以内（eToro 持仓）')}${opt('ev', '重要经济事件', `${ccyOf().join(' / ')} 高影响事件公布前 30 / 5 分钟；BLS 公布新的非农、CPI 时（需本地代理）`)}</div>
+<div class="note2">价位、情景、止损止盈只监控当前品种和周期，需保持页面打开；开启后自动连接实时行情。${np}。</div>
 ${blk('all', `最近预警 <span class="n">${Math.min(10, alLog.length)}</span>`, lg)}`;
 }
 /* 右侧可折叠块：标题右侧放该块对应的图上标注开关；开合状态记在本地，默认展开 */
@@ -205,12 +207,13 @@ function setTab(k, save = 1) {
   TAB = k;
   if (save) LS.set('pnTab', k);
   if (k == 'al') alNew = 0;
+  if (k == 'ev') loadNews();
   /* 面板标签和收起后图标条上的同一页一起高亮 */
   document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab == k));
   document.querySelectorAll('#pn .tabp').forEach(p => p.classList.toggle('on', p.dataset.p == k));
   tabBadges();
 }
-/* 标签上的徽标：交易 = 当前持仓笔数；预警 = 未读条数，开着且无未读时为呼吸圆点。非 eToro 品种隐藏“交易” */
+/* 标签上的徽标：交易 = 当前持仓笔数；事件 = 24 小时内相关货币的高影响事件数；预警 = 未读条数，开着且无未读时为呼吸圆点。CSV 隐藏“交易” */
 function tabBadges() {
   const et = hasTr(),
     n = TR && TR.sym === cur.sym ? TR.open.length : 0;
@@ -219,6 +222,7 @@ function tabBadges() {
     b.querySelector('.bdg').textContent = n || '';
   });
   if (!et && TAB == 'tr') return setTab('an', 0);
+  document.querySelectorAll('[data-tab="ev"] .bdg').forEach(b => (b.textContent = evSoon() || ''));
   document.querySelectorAll('[data-tab="al"] .bdg').forEach(b => {
     b.textContent = alNew || '';
     b.classList.toggle('live', !!AL.on);
@@ -237,6 +241,7 @@ function initPanel() {
     const q = s => e.target.closest(s);
     let x;
     if ((x = q('[data-tab]'))) return setTab(x.dataset.tab);
+    if ((x = q('[data-go]'))) return setTab(x.dataset.go);
     if (q('#fold')) return foldAll();
     if (q('#pcol')) return setPcol(1);
     /* 块标题里的按钮：只做自己的事，不触发块的开合 */
@@ -248,6 +253,9 @@ function initPanel() {
     if (q('#trr')) return loadTrades();
     if (q('#trv')) return openReview();
     if (q('#btgo')) return openBacktest();
+    if (q('#evr')) return loadEvents(), loadNews(1);
+    if ((x = q('[data-evo]'))) return setEvOpt(x.dataset.evo, x.dataset.v);
+    if ((x = q('.evr[data-ev]'))) return hlEvent(EV && EV.events && EV.events.find(e => e.id == x.dataset.ev));
     if ((x = q('.sg[data-n]'))) return lastM && hlSig(lastM.t.a.sigs[+x.dataset.n]);
     if ((x = q('.lvr[data-lv]'))) return lastM && hlLevel(lastM.L.find(l => l.p == +x.dataset.lv));
     if ((x = q('.sc[data-sc]'))) return lastM && hlScene(lastM.sc[+x.dataset.sc]);

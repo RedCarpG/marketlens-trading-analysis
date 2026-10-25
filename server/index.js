@@ -7,12 +7,15 @@
    GET /api/candles?src=&symbol=&interval=&count=       → 标准化K线数组（旧到新）
    WS  /api/stream?src=&symbol=&interval=               → 推送标准化单根K线（附报价时间 qt）
    旧路径 /api/etoro/candles、/api/etoro/stream 等同 src=etoro。
+   GET /api/events/calendar                             → 经济日历（Forex Factory + BLS / 美联储官方日程）与 BLS 最新官方数据
+   GET /api/events/news?topic=&lang=                    → 新闻（RSS，按主题和语言）
    密钥只从项目根目录 .env 读取，不发给前端、不写日志。 */
 const http = require('http'), fs = require('fs'), path = require('path');
 const { WebSocketServer } = require('ws');
 const { TFS, createClient, createTrader, advance, pickPrice, Upstream } = require('./etoro');
 const { createStore } = require('./store');
 const { createYahoo } = require('./yahoo');
+const { createEvents, parseFeeds, TOPIC, LANGS } = require('./events');
 
 const ROOT = path.resolve(__dirname, '..');
 function loadEnv(f) {
@@ -68,6 +71,8 @@ const SRCS = {
 /* 交易记录用单独的只读密钥，与行情密钥分开 */
 const TKEYS = !!(E.ETORO_TRADE_API_KEY && E.ETORO_TRADE_USER_KEY);
 const trader = createTrader({ apiKey: E.ETORO_TRADE_API_KEY, userKey: E.ETORO_TRADE_USER_KEY, baseUrl: E.ETORO_BASE_URL || 'https://public-api.etoro.com' });
+/* 经济日历与新闻：公开来源，不需要密钥；拉到的日历存在 var/events（EVENTS_DIR 可改位置） */
+const events = createEvents({ dir: E.EVENTS_DIR || path.join(ROOT, 'var', 'events'), ua: E.EVENTS_UA || undefined, blsKey: E.BLS_API_KEY || '', feeds: parseFeeds(E.NEWS_FEEDS) });
 
 /* 页面文件：只托管 web/ 目录下的 html/css/js；路径规范化后必须仍在 web/ 内，防止 ../ 穿越读到 .env 等 */
 const WEB = path.join(ROOT, 'web');
@@ -107,8 +112,19 @@ const server = http.createServer(async (req, res) => {
   if (u.pathname === '/market-analyzer.html') { res.writeHead(302, { location: '/' }); return res.end(); }
   if (!u.pathname.startsWith('/api/') && serveWeb(u, res)) return;
   if (u.pathname.startsWith('/api/') && (!HOSTS.has(req.headers.host) || (req.headers.origin && !ORIGINS.has(req.headers.origin)))) return json(res, 403, { error: 'forbidden' });
-  if (u.pathname === '/api/health') return json(res, 200, { ok: true, keys: KEYS, trade: TKEYS, price: PRICE });
+  if (u.pathname === '/api/health') return json(res, 200, { ok: true, keys: KEYS, trade: TKEYS, price: PRICE, events: true });
   if (u.pathname === '/api/sources') return json(res, 200, { etoro: { ok: KEYS }, yahoo: { ok: true }, history: { ok: true, sets: histSets() } });
+  /* 经济日历与新闻：主题、语言只接受预设值，代理只访问 events.js 里列出的地址 */
+  if (u.pathname === '/api/events/calendar') {
+    try { return json(res, 200, await events.calendar()); }
+    catch (e) { console.warn(`[events] ${e.message}`); return json(res, 502, { error: e.message }); }
+  }
+  if (u.pathname === '/api/events/news') {
+    const topic = u.searchParams.get('topic') || 'macro', lang = u.searchParams.get('lang') || 'zh';
+    if (!TOPIC[topic] || !LANGS[lang]) return json(res, 400, { error: `topic 须为 ${Object.keys(TOPIC).join('/')}，lang 须为 ${Object.keys(LANGS).join('/')}` });
+    try { return json(res, 200, await events.news(topic, lang)); }
+    catch (e) { console.warn(`[news] ${e.message}`); return json(res, 502, { error: e.message }); }
+  }
   /* 本地K线存储概况：每个品种/周期的根数与起止时间 */
   if (u.pathname === '/api/store') return json(res, 200, store.list());
   /* 个人交易：已平仓 ?symbol=&days=（1–364，默认 364）与当前持仓 ?symbol=；给了 symbol 时只返回该品种 */

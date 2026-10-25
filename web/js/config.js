@@ -3,7 +3,8 @@ const $ = s => document.querySelector(s);
 /* 是否经本地代理打开：eToro 行情、交易记录和K线存储都要通过本机代理（127.0.0.1），在其他地方（如 GitHub Pages、直接打开文件）不可用 */
 const LOCAL = /^(127\.0\.0\.1|localhost|\[::1\])$/.test(location.hostname) && location.protocol.startsWith('http');
 /* grp：左侧分组；新增品种时指定分组，GRPS 决定分组顺序。
-   srcs：可切换的数据服务 → 该服务里的代码（src 为默认，设置里可改，按品种记在本地；服务说明见 data.js 的 SRCN） */
+   srcs：可切换的数据服务 → 该服务里的代码（src 为默认，设置里可改，按品种记在本地；服务说明见 data.js 的 SRCN）
+   ccy：经济日历里与它相关的货币（默认 USD）；news：新闻主题 gold / btc（不写为宏观），见 events.js */
 const WL = [
   {
     sym: 'GOLD',
@@ -12,6 +13,7 @@ const WL = [
     srcs: { etoro: 'GOLD', yahoo: 'GC=F', history: 'gc' },
     p: 2,
     grp: '黄金',
+    news: 'gold',
   },
   {
     sym: 'BTCUSDT',
@@ -20,10 +22,11 @@ const WL = [
     srcs: { binance: 'BTCUSDT', history: 'btc' },
     p: 2,
     grp: '加密货币',
+    news: 'btc',
   },
-  { sym: 'GC', name: '黄金期货 GC', src: 'demo', p: 2, base: 2650, grp: '模拟' },
+  { sym: 'GC', name: '黄金期货 GC', src: 'demo', p: 2, base: 2650, grp: '模拟', news: 'gold' },
   { sym: 'AAPL', name: '苹果 AAPL', src: 'demo', p: 2, base: 230, grp: '模拟' },
-  { sym: 'EURUSD', name: '欧元/美元', src: 'demo', p: 5, base: 1.08, grp: '模拟' },
+  { sym: 'EURUSD', name: '欧元/美元', src: 'demo', p: 5, base: 1.08, grp: '模拟', ccy: ['EUR', 'USD'] },
 ];
 const GRPS = ['黄金', '美股', '外汇', '加密货币', '模拟', '本地'];
 /* 本机偏好（主题、配色、分组折叠、上次品种）；存储不可用时用默认值 */

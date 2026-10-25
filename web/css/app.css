@@ -540,7 +540,7 @@ button:disabled {
   overflow-y: auto;
   overscroll-behavior: contain;
 }
-/* 面板收起后的图标条：展开按钮 + 三个标签页（带徽标），点图标直接展开到那一页 */
+/* 面板收起后的图标条：展开按钮 + 四个标签页（带徽标），点图标直接展开到那一页 */
 #rail {
   position: fixed;
   z-index: 10;
@@ -1223,11 +1223,14 @@ details[open]::details-content {
 .tabs.noanim::after {
   transition: none;
 }
+/* 四个标签页带徽标时也不换行（窄面板上收紧内边距） */
 .tabs button[data-tab] {
   display: inline-flex;
+  flex: none;
   align-items: center;
-  gap: 6px;
-  padding: 7px 10px 9px;
+  gap: 5px;
+  padding: 7px 9px 9px;
+  white-space: nowrap;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -1762,6 +1765,246 @@ details[open]::details-content {
 .t-lv,
 .k-lv {
   --k: var(--mu);
+}
+.t-ev,
+.k-ev {
+  --k: #d9822b;
+}
+
+/* ===== 事件页：来源覆盖、下一个重要事件、官方数据、经济日历、新闻 =====
+   影响等级：三格小方块，高 = 红、中 = 橙、低 = 灰（与涨跌色无关，换红涨绿跌时不变） */
+.evr,
+.evf {
+  --im: var(--mu);
+}
+.i3 {
+  --im: #e5484d;
+}
+.i2 {
+  --im: #f0a73a;
+}
+.srcs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 0 2px 8px;
+  font-size: 11px;
+}
+.src.ok {
+  color: var(--mu);
+}
+.src.bad {
+  color: #d9822b;
+  cursor: help;
+}
+.evoff {
+  margin: 4px 0 8px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, #d9822b 45%, var(--bd));
+  border-radius: var(--rs);
+  background: color-mix(in srgb, #d9822b 8%, transparent);
+}
+.evoff .mu {
+  margin-top: 2px;
+}
+.evh {
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--bd);
+  border-radius: var(--r);
+}
+.evh.soon {
+  border-color: color-mix(in srgb, #e5484d 45%, var(--bd));
+  background: color-mix(in srgb, #e5484d 6%, transparent);
+}
+.evh .tag {
+  margin: 0;
+}
+.evt {
+  margin: 4px 0 2px;
+  font-size: 15px;
+  font-weight: 650;
+}
+.evday {
+  margin: 10px 0 2px;
+  padding-bottom: 2px;
+  border-bottom: 1px solid var(--bd);
+  color: var(--mu);
+  font-size: 11px;
+  font-weight: 600;
+}
+.evday:first-of-type {
+  margin-top: 2px;
+}
+.evr {
+  position: relative;
+  margin: 1px -4px;
+  padding: 4px 8px 4px 12px;
+  border-radius: var(--rs);
+  transition: background-color 0.2s var(--ease);
+  animation: fadeIn 0.24s var(--ease);
+}
+.evr::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--ac);
+  transform: scaleY(0);
+  transition: transform 0.24s var(--ease);
+}
+.evr.past {
+  opacity: 0.62;
+}
+.evr.go {
+  cursor: pointer;
+}
+.evr.go:hover {
+  background: var(--pn2);
+  opacity: 1;
+}
+.evr.on {
+  background: var(--acs);
+  opacity: 1;
+}
+.evr.on::before {
+  transform: scaleY(1);
+}
+.evr .et {
+  min-width: 34px;
+  color: var(--mu);
+  font-size: 11.5px;
+}
+.evr .cc {
+  min-width: 26px;
+  color: var(--mu);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.evr.i3 .en {
+  font-weight: 650;
+}
+.evr .ok {
+  margin-left: 4px;
+  color: var(--up);
+  font-size: 10.5px;
+}
+.im {
+  display: inline-flex;
+  gap: 1.5px;
+}
+.im i {
+  width: 4px;
+  height: 9px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--mu) 30%, transparent);
+}
+.i1 .im i:nth-child(-n + 1),
+.i2 .im i:nth-child(-n + 2),
+.i3 .im i {
+  background: var(--im);
+}
+.ev2 {
+  padding-left: 42px;
+}
+.ev2.warn,
+.evw {
+  color: #d9822b;
+}
+.evf {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 5px;
+  border-radius: 2px;
+  background: var(--im);
+}
+/* 分析页评分卡底部的事件提示：点击切到事件页 */
+.evw {
+  margin-top: 10px;
+  padding: 6px 8px;
+  border-radius: var(--rs);
+  background: color-mix(in srgb, #d9822b 10%, transparent);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.evw small {
+  display: block;
+  color: var(--mu);
+  font-size: 11px;
+  font-weight: 400;
+}
+.evw.past {
+  background: var(--bg);
+  color: var(--tx);
+}
+.evw.off {
+  background: transparent;
+  padding: 0;
+  color: var(--mu);
+  font-size: 11px;
+  font-weight: 400;
+}
+/* 官方数据：名称（参考月份、初值）· 数值 · 前值，三列对齐 */
+.evd {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: baseline;
+  gap: 8px;
+  padding: 2px 0;
+}
+.evd b {
+  font-variant-numeric: tabular-nums;
+}
+.evd small,
+.evd .dp {
+  color: var(--mu);
+  font-size: 11px;
+}
+.evd small {
+  display: inline-block;
+  margin-left: 6px;
+  white-space: nowrap;
+}
+.evd .dp {
+  min-width: 64px;
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.nwi {
+  display: block;
+  margin: 2px -4px;
+  padding: 6px 8px;
+  border-radius: var(--rs);
+  color: inherit;
+  text-decoration: none;
+  transition: background-color 0.2s var(--ease);
+  animation: fadeIn 0.24s var(--ease);
+}
+a.nwi[href]:hover {
+  background: var(--pn2);
+}
+a.nwi[href]:hover .nt {
+  color: var(--ac);
+}
+.nwi .nt {
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.nwi .tag:first-child {
+  margin: 0 6px 0 0;
+}
+.tag.o {
+  background: var(--acs);
+  color: var(--ac);
+}
+#hov .hev .evf {
+  vertical-align: 0;
 }
 
 /* ===== 预警弹出提示：右下角堆叠，从右侧滑入，底部细线倒计时 10 秒，点击关闭 ===== */

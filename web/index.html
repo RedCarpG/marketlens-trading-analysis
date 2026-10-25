@@ -167,6 +167,7 @@
       <nav class="tabs" id="pnt">
         <button data-tab="an">分析</button>
         <button data-tab="tr">交易<i class="bdg"></i></button>
+        <button data-tab="ev">事件<i class="bdg"></i></button>
         <button data-tab="al">预警<i class="bdg"></i></button>
         <span class="sp"></span>
         <button class="ib sm" id="fold" title="本页的块全部展开 / 收起">
@@ -201,6 +202,7 @@
       </nav>
       <div class="tabp" data-p="an"></div>
       <div class="tabp" data-p="tr"></div>
+      <div class="tabp" data-p="ev"></div>
       <div class="tabp" data-p="al"></div>
     </aside>
     <nav class="glass" id="rail">
@@ -245,6 +247,21 @@
           stroke-linejoin="round"
         >
           <path d="M7 10h13l-4-4M17 14H4l4 4" /></svg
+        ><i class="bdg"></i>
+      </button>
+      <button class="ib" data-tab="ev" title="事件（经济日历与新闻）">
+        <svg
+          width="17"
+          height="17"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <rect x="4" y="5" width="16" height="15" rx="2" />
+          <path d="M8 3v4M16 3v4M4 10h16M8 14h2M14 14h2M8 17h2" /></svg
         ><i class="bdg"></i>
       </button>
       <button class="ib" data-tab="al" title="预警">
@@ -299,6 +316,7 @@
     <script src="js/marks.js"></script>
     <script src="js/highlight.js"></script>
     <script src="js/trades.js"></script>
+    <script src="js/events.js"></script>
     <script src="js/hover.js"></script>
     <script src="js/chart-indicators.js"></script>
     <script src="js/panel.js"></script>
