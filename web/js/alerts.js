@@ -96,7 +96,7 @@ function evalAlerts(m) {
           'sl|' + p.id + '|' + n,
           d <= x * 0.5,
           d >= x,
-          `${cur.sym} 价格 ${f(now)} 接近我的${n} ${f(v)}（相距 ${(d / x).toFixed(1)} ATR，触及约 ${pl >= 0 ? '+' : ''}${pl.toFixed(0)}）`,
+          `${cur.sym} 价格 ${f(now)} 接近我的${n} ${f(v)}（相距 ${(d / x).toFixed(1)} ATR，触及约 ${money(pl)}）`,
           n == '止损' ? 'dn' : 'up'
         );
       })

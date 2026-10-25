@@ -66,7 +66,7 @@ ${evs ? `<div class="hs hev">${evs}</div>` : ''}
 ${
   sg.length || trs.length
     ? `<div class="hs">${sg.map(g => `<div><span style="color:${dc(g.dir)}">${g.dir > 0 ? '▲' : '▼'}</span> ${g.t}</div>`).join('')}
-${trs.map(([t, w]) => `<div><span style="color:var(${t.isBuy ? '--tb' : '--ts'})">${t.isBuy ? '▲' : '▼'}</span> 我的${t.isBuy ? '买' : '卖'}单${w} @${f(w == '平仓' ? t.closeRate : t.openRate)}${w == '平仓' ? ` <b style="color:${dc(t.netProfit)}">${t.netProfit >= 0 ? '+' : ''}${t.netProfit.toFixed(2)}</b>` : ''}</div>`).join('')}</div>`
+${trs.map(([t, w]) => `<div><span style="color:var(${t.isBuy ? '--tb' : '--ts'})">${t.isBuy ? '▲' : '▼'}</span> 我的${t.isBuy ? '买' : '卖'}单${w} @${f(w == '平仓' ? t.closeRate : t.openRate)}${w == '平仓' ? ` <b style="color:${dc(t.netProfit)}">${money(t.netProfit, t.closeTs)}</b>` : ''}</div>`).join('')}</div>`
     : ''
 }`;
 }

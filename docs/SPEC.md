@@ -215,6 +215,7 @@ K线图铺满整个窗口作为背景，周围的块半透明（背景模糊）�
 - 主图（“我的交易”开关）：最近60笔已平仓——开仓圆点（买/卖）→ 虚线 → 平仓方块（净盈亏），盈利涨色、亏损跌色；交易时间对齐到所在K线起点，早于已加载数据的不画。持仓——开仓圆点 + 向右延伸的虚线 + “持仓 买/卖 数量 @价格 · 浮盈”；止损/止盈离现价30%以内才画（过滤 eToro 默认的远端止损）。
 - 右侧“交易”页：工具栏（图上显示、复盘、刷新）、近一年该品种已平仓笔数/胜率/净盈亏/平均持仓时长四格统计、“当前持仓”块、“最近平仓”块（最近10笔）；点击任一行用竖条高亮开仓（和平仓）所在K线并定位。
 - 只含手动持仓，不含跟单。点击交易/信号后滚动到目标之后约15根，使目标落在画面中部偏右。
+- 金额币种（2026-10-25）：交易记录的金额是 eToro 交易账户的美元（接口文档：持仓金额、隔夜费、可用余额均为 USD，浮动盈亏为账户货币；交易历史和持仓接口没有换币种的参数）。交易页“金额币种”可选美元 / 欧元 / 人民币，记在本地：已平仓按平仓日收盘汇率换算（合计为逐笔换算后相加），持仓的浮动盈亏和止损止盈处的盈亏按当前汇率；交易页、图上交易标注、悬停卡、交易复盘（含洞察文字）、接近止损止盈的预警都带币种符号。汇率由代理 `GET /api/fx?ccy=EUR|CNY` 提供：优先 eToro 外汇品种日线（EURUSD 取倒数；人民币用离岸 USDCNH，与在岸 CNY 相差很小），取不到或数值不合理时用 Yahoo（EUR=X、CNY=X），缓存 10 分钟；取不到时按美元显示并说明。价格（开仓价、平仓价）是品种报价货币，不换算。不经本地代理打开时只能显示美元。
 
 ### 3.3.6 价格预警（2026-10-24）
 
@@ -356,6 +357,7 @@ web/
    │  ├─ mtf.js            周期上下文与多周期结论（closed/ctx/analyzeMTF）
    │  ├─ scenarios.js      价格行为情景
    │  ├─ review.js         交易复盘（逐笔重算开仓时的分析、汇总）
+   │  ├─ money.js          金额币种与汇率换算（CCY / fxAt / fmtMoney）
    │  ├─ backtest.js       回测引擎（逐根回放、模拟成交、出场规则、统计；页面回测面板与命令行共用，见 docs/BACKTEST.md）
    │  └─ demo.js           模拟行情
    ├─ config.js            DOM 简写、自选列表、本机偏好存储（含 finbot.* → marketlens.* 迁移）
@@ -377,5 +379,5 @@ web/
 
 - 各文件共享全局作用域（普通脚本，非 ES 模块）：只有 app.js 末尾的 `init()` 和少量常量初始化在加载时执行，其余都是函数，调用时才互相引用，所以除“config.js 在前、app.js 最后”外顺序不敏感。
 - 代理只托管 `web/` 下的 html/css/js（路径规范化后必须仍在 web/ 内），旧地址 `/market-analyzer.html` 302 跳到首页。
-- 测试：项目根目录 `npm test`（Node 自带 node:test）。`tests/load-core.js` 在 vm 中按浏览器顺序加载 core/；`tests/golden.test.js` 对比 `tests/fixtures/golden-demo.json`（模拟数据，不含真实行情）；`tests/review.test.js` 验证复盘只用开仓前已收盘的K线并与 analyzeMTF 一致；`tests/store.test.js` 验证K线存储合并与读写；`tests/core.test.js` 为时间网格、已收盘判断、摆动点、前高前低、价位合并、情景触发（含收紧选项）等单元测试；`tests/backtest.test.js` 验证回测不偷看未来、只限定入场区间、模拟成交规则、统计函数，并在随机游走数据上做空白对照；`tests/import-history.test.js` 验证历史导入的清洗、日期归一与周线/月线聚合；`tests/yahoo.test.js` 验证 Yahoo 数据的解析、清洗、日内对齐与聚合（不联网）；`tests/events.test.js` 验证经济日历与新闻（美东时间与夏令时换算、Forex Factory / BLS 日程 / RSS / Atom 解析、与官方日程核对合并、BLS 数值计算、缓存与失败回退、改期替换、公布后重查官方数据）。回测命令行 `npm run backtest`（tools/backtest.js，读本地K线存储或 `--data` 指定的导入历史，结果写到 var/backtest/）；`npm run import`（tools/import-history.js）从 Yahoo（黄金期货日线）、Binance（分页）或 CSV 导入长周期历史到 var/history/；`npm run bt:compare`（tools/bt-compare.js）按事先定好的几组情景规则并行回放、计入成本对比。核心算法有意改动时需重新生成标准答案。
+- 测试：项目根目录 `npm test`（Node 自带 node:test）。`tests/load-core.js` 在 vm 中按浏览器顺序加载 core/；`tests/golden.test.js` 对比 `tests/fixtures/golden-demo.json`（模拟数据，不含真实行情）；`tests/review.test.js` 验证复盘只用开仓前已收盘的K线并与 analyzeMTF 一致；`tests/store.test.js` 验证K线存储合并与读写；`tests/core.test.js` 为时间网格、已收盘判断、摆动点、前高前低、价位合并、情景触发（含收紧选项）、汇率取值与金额格式等单元测试；`tests/backtest.test.js` 验证回测不偷看未来、只限定入场区间、模拟成交规则、统计函数，并在随机游走数据上做空白对照；`tests/import-history.test.js` 验证历史导入的清洗、日期归一与周线/月线聚合；`tests/yahoo.test.js` 验证 Yahoo 数据的解析、清洗、日内对齐与聚合（不联网）；`tests/events.test.js` 验证经济日历与新闻（美东时间与夏令时换算、Forex Factory / BLS 日程 / RSS / Atom 解析、与官方日程核对合并、BLS 数值计算、缓存与失败回退、改期替换、公布后重查官方数据）。回测命令行 `npm run backtest`（tools/backtest.js，读本地K线存储或 `--data` 指定的导入历史，结果写到 var/backtest/）；`npm run import`（tools/import-history.js）从 Yahoo（黄金期货日线）、Binance（分页）或 CSV 导入长周期历史到 var/history/；`npm run bt:compare`（tools/bt-compare.js）按事先定好的几组情景规则并行回放、计入成本对比。核心算法有意改动时需重新生成标准答案。
 - 格式化：`npm run format`（Prettier 3.3.3，配置见 `.prettierrc.json`）。

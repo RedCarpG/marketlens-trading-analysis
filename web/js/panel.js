@@ -251,6 +251,7 @@ function initPanel() {
     }
     if (q('[data-al-on]')) return setAlertsOn(!AL.on);
     if (q('#trr')) return loadTrades();
+    if ((x = q('[data-trccy]'))) return x.disabled || setTrCcy(x.dataset.trccy);
     if (q('#trv')) return openReview();
     if (q('#btgo')) return openBacktest();
     if (q('#evr')) return loadEvents(), loadNews(1);

@@ -68,7 +68,8 @@ function reviewTrade(t, all) {
 }
 
 /* 汇总：只统计已平仓且复盘成功的交易；按顺逆势、入场位置、止损、是否有同向情景分组，并给出几条最值得注意的结论 */
-function summarizeReviews(rvs) {
+/* cs：洞察文字里金额前的币种符号（可省略） */
+function summarizeReviews(rvs, cs = '') {
   const ok = rvs.filter(r => r.ok && r.win != null),
     net = a => a.reduce((s, r) => s + r.t.netProfit, 0),
     loss = -ok.filter(r => r.t.netProfit < 0).reduce((s, r) => s + r.t.netProfit, 0);
@@ -98,7 +99,7 @@ function summarizeReviews(rvs) {
   if (loss > 0)
     for (const w of worst)
       insights.push(
-        `${w.name}：${w.n} 笔，胜率 ${Math.round((w.win / w.n) * 100)}%，净亏 ${w.net.toFixed(0)}，相当于全部亏损额的 ${Math.round((-w.net / loss) * 100)}%`
+        `${w.name}：${w.n} 笔，胜率 ${Math.round((w.win / w.n) * 100)}%，净亏 ${cs}${(-w.net).toFixed(0)}，相当于全部亏损额的 ${Math.round((-w.net / loss) * 100)}%`
       );
   const best = Object.values(groups)
     .flat()
@@ -106,7 +107,7 @@ function summarizeReviews(rvs) {
     .sort((a, b) => b.net - a.net)[0];
   if (best)
     insights.push(
-      `${best.name}：${best.n} 笔，胜率 ${Math.round((best.win / best.n) * 100)}%，净赚 ${best.net.toFixed(0)}`
+      `${best.name}：${best.n} 笔，胜率 ${Math.round((best.win / best.n) * 100)}%，净赚 ${cs}${best.net.toFixed(0)}`
     );
   if (holdWin != null && holdLoss != null && holdLoss > holdWin * 1.5)
     insights.push(

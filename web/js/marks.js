@@ -513,7 +513,6 @@ function trMarks(t, open) {
     f = v => v.toFixed(cur.p),
     ts = bars[bars.length - 1].timestamp,
     now = bars[bars.length - 1].close,
-    sg = v => `${v >= 0 ? '+' : ''}${v.toFixed(Math.abs(v) >= 100 ? 0 : 2)}`,
     items = [],
     labs = [],
     lab = (v, text, color) => labs.push({ v, text, color, kind: 'fill' });
@@ -528,7 +527,12 @@ function trMarks(t, open) {
           { timestamp: b, value: t.closeRate },
         ],
         onClick: ovClick(() => hlTrade(t, 'c|' + t.id, 1)),
-        extendData: { buy: t.isBuy, color: t.isBuy ? TB : TS, pl: t.netProfit >= 0 ? U : D, text: sg(t.netProfit) },
+        extendData: {
+          buy: t.isBuy,
+          color: t.isBuy ? TB : TS,
+          pl: t.netProfit >= 0 ? U : D,
+          text: money(t.netProfit, t.closeTs),
+        },
       });
     return { items, labs };
   }
@@ -546,7 +550,7 @@ function trMarks(t, open) {
   });
   lab(
     t.openRate,
-    `持仓 ${t.isBuy ? '多' : '空'} ${+t.units.toFixed(2)} @${f(t.openRate)}${t.pnl != null ? ' ' + sg(t.pnl) : ''}`,
+    `持仓 ${t.isBuy ? '多' : '空'} ${+t.units.toFixed(2)} @${f(t.openRate)}${t.pnl != null ? ' ' + money(t.pnl) : ''}`,
     t.pnl == null ? (t.isBuy ? TB : TS) : t.pnl >= 0 ? U : D
   );
   [
@@ -567,7 +571,7 @@ function trMarks(t, open) {
         points: [{ timestamp: a, value: v }],
         extendData: { color: c, size: 1.5, dash: 'dashdot', ray: 1, tag },
       });
-      lab(v, `${n} ${f(v)} · ≈${sg(pAt(v))}`, c);
+      lab(v, `${n} ${f(v)} · ≈${money(pAt(v))}`, c);
     }
   });
   return { items, labs };

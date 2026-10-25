@@ -52,12 +52,12 @@ function createClient({ apiKey, userKey, baseUrl, symbolMap = {}, store = null }
     return hit.instrumentId;
   }
   /* 总是取最近 1000 根并缓存，不同 count 的请求共用；有本地存储时把这 1000 根并入已存历史，返回合并后的完整序列 */
-  async function fetch1000(id, tf) {
+  async function fetch1000(id, tf, keep = true) {
     const d = await get(`/api/v1/market-data/instruments/${id}/history/candles/desc/${IV[tf]}/1000`);
     const list = (d.candles && d.candles[0] && d.candles[0].candles) || [];
     const fresh = list.map(c => ({ timestamp: Date.parse(c.fromDate), open: +c.open, high: +c.high, low: +c.low, close: +c.close, volume: +c.volume || 0 }))
       .filter(b => Number.isFinite(b.timestamp) && Number.isFinite(b.close)).sort((a, b) => a.timestamp - b.timestamp);
-    return store ? store.merge(id, tf, fresh) : fresh;
+    return store && keep ? store.merge(id, tf, fresh) : fresh;
   }
   const raw = (id, tf) => cached(`c:${id}:${tf}`, TTL[tf], () => fetch1000(id, tf));
   /* 后台补拉：把本地已存过的每个品种/周期重新拉一次（绕过缓存），保证长时间不开页面时 15m 等短周期也不断档 */
@@ -81,7 +81,12 @@ function createClient({ apiKey, userKey, baseUrl, symbolMap = {}, store = null }
     const id = await resolve(sym);
     return (tf === '1M' ? await monthly(id) : await raw(id, tf)).slice(-count).map(b => ({ ...b }));
   }
-  return { resolve, candles, refreshStored };
+  /* 只取不存：最近 1000 根，不并入本地存储（因此也不进后台补拉），如交易页换算用的汇率；缓存时长同 candles */
+  async function peek(sym, tf) {
+    const id = await resolve(sym);
+    return (await cached(`p:${id}:${tf}`, TTL[tf], () => fetch1000(id, tf, false))).map(b => ({ ...b }));
+  }
+  return { resolve, candles, peek, refreshStored };
 }
 
 /* eToro 部分时间字段不带时区（如 "2026-10-22T18:57:30.053"），按 UTC 处理 */

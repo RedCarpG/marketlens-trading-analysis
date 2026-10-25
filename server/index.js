@@ -7,6 +7,7 @@
    GET /api/candles?src=&symbol=&interval=&count=       → 标准化K线数组（旧到新）
    WS  /api/stream?src=&symbol=&interval=               → 推送标准化单根K线（附报价时间 qt）
    旧路径 /api/etoro/candles、/api/etoro/stream 等同 src=etoro。
+   GET /api/fx?ccy=EUR|CNY                              → 汇率：1 美元 = ? 目标货币的日线与当前值（交易页金额换算用）
    GET /api/events/calendar                             → 经济日历（Forex Factory + BLS / 美联储官方日程）与 BLS 最新官方数据
    GET /api/events/news?topic=&lang=                    → 新闻（RSS，按主题和语言）
    密钥只从项目根目录 .env 读取，不发给前端、不写日志。 */
@@ -68,6 +69,31 @@ const SRCS = {
   },
 };
 
+/* 汇率（交易页把美元金额换成欧元 / 人民币）：1 美元 = ? 目标货币，日线（约 3 年）与当前值，缓存 10 分钟；只取不存（不进本地K线存储和后台补拉）。
+   优先 eToro 外汇品种（需行情密钥；EURUSD 取倒数，USDCNH 为离岸人民币），取不到或数值不合理时用 Yahoo（EUR=X、CNY=X） */
+const FXS = { EUR: { etoro: 'EURUSD', inv: true, yahoo: 'EUR=X', ok: r => r > 0.5 && r < 2 }, CNY: { etoro: 'USDCNH', inv: false, yahoo: 'CNY=X', ok: r => r > 4 && r < 10 } };
+const fxCache = new Map();
+async function fxRates(ccy) {
+  const c = fxCache.get(ccy);
+  if (c && Date.now() - c.at < 600e3) return c.p;
+  const F = FXS[ccy];
+  const p = (async () => {
+    if (KEYS) {
+      try {
+        const bars = await client.peek(F.etoro, '1d'), rates = bars.map(b => [b.timestamp, F.inv ? 1 / b.close : b.close]);
+        if (rates.length > 100 && rates.every(([, r]) => F.ok(r))) return { ccy, src: 'eToro ' + F.etoro, rates, now: { rate: rates[rates.length - 1][1], time: Date.now() } };
+      } catch (e) { console.warn(`[fx] eToro ${F.etoro}: ${e.message}，改用 Yahoo`); }
+    }
+    const bars = await yahoo.candles(F.yahoo, '1d', 1100), q = await yahoo.quote(F.yahoo).catch(() => null);
+    const rates = bars.map(b => [b.timestamp, b.close]).filter(([, r]) => F.ok(r));
+    if (!rates.length) throw new Error('取不到汇率');
+    return { ccy, src: 'Yahoo ' + F.yahoo, rates, now: q && F.ok(q.price) ? { rate: q.price, time: q.time } : { rate: rates[rates.length - 1][1], time: rates[rates.length - 1][0] } };
+  })();
+  fxCache.set(ccy, { at: Date.now(), p });
+  p.catch(() => fxCache.delete(ccy));
+  return p;
+}
+
 /* 交易记录用单独的只读密钥，与行情密钥分开 */
 const TKEYS = !!(E.ETORO_TRADE_API_KEY && E.ETORO_TRADE_USER_KEY);
 const trader = createTrader({ apiKey: E.ETORO_TRADE_API_KEY, userKey: E.ETORO_TRADE_USER_KEY, baseUrl: E.ETORO_BASE_URL || 'https://public-api.etoro.com' });
@@ -114,6 +140,12 @@ const server = http.createServer(async (req, res) => {
   if (u.pathname.startsWith('/api/') && (!HOSTS.has(req.headers.host) || (req.headers.origin && !ORIGINS.has(req.headers.origin)))) return json(res, 403, { error: 'forbidden' });
   if (u.pathname === '/api/health') return json(res, 200, { ok: true, keys: KEYS, trade: TKEYS, price: PRICE, events: true });
   if (u.pathname === '/api/sources') return json(res, 200, { etoro: { ok: KEYS }, yahoo: { ok: true }, history: { ok: true, sets: histSets() } });
+  if (u.pathname === '/api/fx') {
+    const ccy = u.searchParams.get('ccy') || '';
+    if (!FXS[ccy]) return json(res, 400, { error: `ccy 须为 ${Object.keys(FXS).join('/')}` });
+    try { return json(res, 200, await fxRates(ccy)); }
+    catch (e) { console.warn(`[fx] ${ccy}: ${e.message}`); return json(res, 502, { error: e.message }); }
+  }
   /* 经济日历与新闻：主题、语言只接受预设值，代理只访问 events.js 里列出的地址 */
   if (u.pathname === '/api/events/calendar') {
     try { return json(res, 200, await events.calendar()); }

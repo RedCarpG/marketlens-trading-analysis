@@ -141,3 +141,19 @@ test('analyze：不足 60 根返回 null', () => {
   const analyze = loadCore()('analyze');
   assert.equal(analyze(Array.from({ length: 59 }, (_, i) => bar(i * H, 1, 1, 1, 1))), null);
 });
+
+test('fxAt / fmtMoney：取当日或之前最近一天的汇率；金额带币种符号', () => {
+  const get = loadCore(),
+    fxAt = get('fxAt'),
+    fmtMoney = get('fmtMoney');
+  const D = d => Date.UTC(2026, 9, d),
+    fx = { ts: [D(19), D(20), D(23)], r: [0.9, 0.91, 0.93] };
+  assert.equal(fxAt(fx, D(20) + 15 * 36e5), 0.91); // 当天
+  assert.equal(fxAt(fx, D(22)), 0.91); // 周末没有汇率，用之前最近一天
+  assert.equal(fxAt(fx, D(25)), 0.93);
+  assert.equal(fxAt(fx, D(1)), 0.9); // 早于第一天
+  assert.equal(fmtMoney(12.3, 'EUR'), '+€12.30');
+  assert.equal(fmtMoney(-85, 'CNY'), '-¥85.00');
+  assert.equal(fmtMoney(5, 'USD', 0), '$5.00');
+  assert.equal(fmtMoney(-12345.6, 'USD'), '-$12346');
+});

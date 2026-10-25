@@ -15,6 +15,7 @@
 | 接口 | 说明 |
 |---|---|
 | `GET /api/sources` | 各数据服务是否可用（eToro 是否配置密钥）、已导入的本地历史数据集（名称、周期、根数、起止） |
+| `GET /api/fx?ccy=EUR\|CNY` | 汇率：`{ ccy, src, rates: [[日期, 1 美元 = ? 目标货币], …], now: { rate, time } }`，交易页把美元金额换成欧元 / 人民币用。优先 eToro 外汇品种日线（EURUSD 取倒数、USDCNH 离岸人民币，需行情密钥），取不到用 Yahoo（EUR=X、CNY=X）；缓存 10 分钟 |
 | `GET /api/candles?src=&symbol=&interval=&count=` | 标准化K线数组（旧到新）；`src` 为 etoro / yahoo / history，`interval` 为 15m/1h/4h/1d/1w/1M，`count` 1–8000，默认 500；Yahoo 代码如 `GC=F`（需 URL 编码），本地历史为数据集名称如 `gc` |
 | `WS /api/stream?src=&symbol=&interval=` | 推送标准化单根K线，同一 timestamp 为更新当前K线；附带 `qt`（最后一笔报价的时间，毫秒），页面用来判断交易中 / 休市。Yahoo 每 15 秒取一次最新价；本地历史没有实时 |
 | `GET /api/etoro/candles`、`WS /api/etoro/stream` | 旧路径，等同 `src=etoro` |

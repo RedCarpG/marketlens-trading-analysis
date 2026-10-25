@@ -16,7 +16,7 @@ async function openReview() {
       if (row) {
         const r = RV.rvs[+row.dataset.i];
         closeReview();
-        hlTrade(r.t, row.dataset.k, 1);
+        hlTrade(r.t._o || r.t, row.dataset.k, 1);
       }
     };
     document.addEventListener('keydown', e => e.key === 'Escape' && closeReview());
@@ -24,16 +24,20 @@ async function openReview() {
   void el.offsetWidth; // 刚创建时先排版一次，淡入过渡才会生效
   el.classList.add('open');
   el.innerHTML = `<div class="rvp"><div class="rvh"><b>交易复盘 · ${cur.sym}</b><button data-rv-close>✕</button></div><div class="mu">正在逐笔复盘…</div></div>`;
+  /* 金额先换成交易页选的币种（已平仓按平仓日汇率，持仓按当前汇率），统计和洞察都按这个币种；_o 留着原记录给图上高亮用 */
+  const ok = fxRate(null) != null,
+    ccy = ok ? trCcy : 'USD',
+    cv = (v, ts) => (v == null || !ok ? v : v * fxRate(ts));
   const trades = [
-    ...TR.closed.map(t => ({ ...t, _k: 'c|' + t.id })),
-    ...TR.open.map(t => ({ ...t, _k: 'o|' + t.id })),
+    ...TR.closed.map(t => ({ ...t, netProfit: cv(t.netProfit, t.closeTs), _o: t, _k: 'c|' + t.id })),
+    ...TR.open.map(t => ({ ...t, pnl: cv(t.pnl, null), _o: t, _k: 'o|' + t.id })),
   ].sort((a, b) => b.openTs - a.openTs);
   const rvs = [];
   for (const t of trades) {
     rvs.push(reviewTrade(t, ALL));
     await new Promise(r => setTimeout(r, 0));
   }
-  RV = { sym: cur.sym, rvs, sum: summarizeReviews(rvs) };
+  RV = { sym: cur.sym, ccy, rvs, sum: summarizeReviews(rvs, CCY[ccy][1]) };
   renderReview();
 }
 
@@ -46,7 +50,7 @@ function renderReview() {
   const { rvs, sum } = RV,
     f = v => v.toFixed(cur.p),
     dc = v => (v > 0 ? 'var(--up)' : v < 0 ? 'var(--dn)' : 'var(--mu)'),
-    sg = v => `${v >= 0 ? '+' : ''}${v.toFixed(Math.abs(v) >= 100 ? 0 : 2)}`,
+    sg = v => fmtMoney(v, RV.ccy),
     pct = (w, n) => (n ? Math.round((w / n) * 100) + '%' : '—'),
     open = rvs.filter(r => r.win == null).length;
   /* 分组表：笔数、胜率、净盈亏，右侧细条按净盈亏绝对值占比 */
@@ -82,7 +86,7 @@ function renderReview() {
 <div class="rvh"><b>交易复盘 · ${RV.sym} · 近一年 ${sum.n} 笔已平仓${open ? `（另 ${open} 笔持仓不计入统计）` : ''}</b><button data-rv-close>✕</button></div>
 <div class="mu sm">只用开仓那一刻之前已收盘的K线，按与实时分析相同的规则重算当时的大周期方向、关键价位和情景；入场周期取 1h / 4h / 1d 中历史够用的最小一个。规则的初步回测未发现可靠优势（可在回测面板查看），只用来帮你反思交易习惯。</div>
 <div class="rvs"><div><span class="mu sm">胜率</span><b>${pct(sum.win, sum.n)}</b><span class="mu sm">${sum.win}/${sum.n}</span></div>
-<div><span class="mu sm">净盈亏</span><b style="color:${dc(sum.net)}">${sg(sum.net)}</b></div>
+<div><span class="mu sm">净盈亏（${CCY[RV.ccy][0]}）</span><b style="color:${dc(sum.net)}">${sg(sum.net)}</b></div>
 <div><span class="mu sm">平均持仓　盈利单</span><b>${fmtHold(sum.holdWin)}</b><span class="mu sm">· 亏损单</span><b>${fmtHold(sum.holdLoss)}</b></div></div>
 ${sum.insights.length ? `<div class="rvi"><b>值得注意</b><ul>${sum.insights.map(s => `<li>${s}</li>`).join('')}</ul></div>` : ''}
 <div class="rvg">${gt('大周期方向', sum.groups.align)}${gt('入场位置', sum.groups.pos)}${gt('止损设置', sum.groups.stop)}${gt('价格行为情景', sum.groups.sc)}</div>

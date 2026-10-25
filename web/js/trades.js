@@ -5,6 +5,56 @@
 /* TRL：正在拉取（“刷新”按钮转圈） */
 let TR = null,
   TRL = 0;
+/* ===== 金额币种：交易记录的金额是 eToro 交易账户的美元。切换成欧元 / 人民币时，已平仓按平仓日的收盘汇率、
+   持仓（浮动盈亏、止损止盈处的盈亏）按当前汇率换算；汇率经本地代理 /api/fx 取得（eToro 外汇品种，取不到用 Yahoo）。
+   汇率还没取到或取不到时仍按美元显示，并标明 $。交易页、图上交易标注、悬停卡、复盘、预警文字共用；币种表与换算见 core/money.js ===== */
+let trCcy = CCY[LS.get('trccy')] ? LS.get('trccy') : 'USD',
+  FX = {};
+/* 1 美元 = ? 当前币种；ts 为空用当前汇率，否则用 ts 所在日（或之前最近一天）的收盘汇率；汇率未就绪返回 null */
+function fxRate(ts) {
+  if (trCcy == 'USD') return 1;
+  const x = FX[trCcy];
+  if (!x || !x.ok) return null;
+  return ts == null ? x.now : fxAt(x, ts);
+}
+/* 美元金额换成当前币种：返回 [数值, 币种] */
+function cvt(usd, ts) {
+  const r = fxRate(ts);
+  return r == null ? [usd, 'USD'] : [usd * r, trCcy];
+}
+/* 带币种符号的金额见 core/money.js 的 fmtMoney */
+const money = (usd, ts, sign) => fmtMoney(...cvt(usd, ts), sign);
+/* 已平仓合计：每笔按自己的平仓日汇率换算后相加 */
+function moneySum(ts) {
+  const ok = fxRate(null) != null,
+    c = ok ? trCcy : 'USD';
+  return [ts.reduce((s, t) => s + t.netProfit * (ok ? fxRate(t.closeTs) : 1), 0), c];
+}
+async function loadFx(c) {
+  if (c == 'USD' || (FX[c] && (FX[c].ok || FX[c].busy))) return;
+  if (!LOCAL) {
+    FX[c] = { err: '汇率需经本地代理取得' };
+    return;
+  }
+  FX[c] = { busy: 1 };
+  try {
+    const r = await fetch('/api/fx?ccy=' + c),
+      j = await r.json();
+    if (!r.ok || !j.rates) throw new Error(j.error || 'HTTP ' + r.status);
+    FX[c] = { ok: 1, ts: j.rates.map(x => x[0]), r: j.rates.map(x => x[1]), now: j.now.rate, src: j.src };
+  } catch (e) {
+    FX[c] = { err: e.message };
+  }
+  if (bars.length) refresh();
+}
+function setTrCcy(c) {
+  if (!CCY[c] || c == trCcy) return;
+  trCcy = c;
+  LS.set('trccy', c);
+  loadFx(c);
+  if (bars.length) refresh();
+}
+if (trCcy != 'USD') loadFx(trCcy);
 const hasTr = () => cur.src != 'csv';
 async function loadTrades() {
   if (!hasTr()) {
@@ -112,10 +162,32 @@ function snapTs(t) {
 function trPanel() {
   const f = v => v.toFixed(cur.p),
     dc = v => (v > 0 ? 'var(--up)' : v < 0 ? 'var(--dn)' : 'var(--mu)'),
-    sg = v => `${v >= 0 ? '+' : ''}${v.toFixed(2)}`,
     on = k => (hlSel === k ? ' on' : ''),
     side = t => `<span style="color:var(${t.isBuy ? '--tb' : '--ts'})">${t.isBuy ? '▲ 买' : '▼ 卖'}</span>`,
-    tools = `<div class="tbar">${chip('tr', '图上显示')}<span class="sp"></span><button class="chip" id="trv" title="逐笔复盘：开仓时的大周期、入场位置、止损、情景">复盘</button><button class="chip" id="trr" title="重新拉取交易记录">${TRL ? '<i class="spin"></i>' : ''}刷新</button></div>`;
+    fx = FX[trCcy] || {},
+    rate = fxRate(null),
+    ccyTip =
+      trCcy == 'USD'
+        ? '金额为 eToro 交易账户的美元'
+        : fx.ok
+          ? `汇率来源 ${fx.src}；当前 1 美元 = ${rate.toFixed(4)} ${CCY[trCcy][0]}；已平仓按平仓日收盘汇率换算，持仓按当前汇率`
+          : '',
+    ccySeg = `<div class="seg trccy" title="${ccyTip}">${Object.entries(CCY)
+      .map(
+        ([k, [n]]) =>
+          `<button data-trccy="${k}" class="${k == trCcy ? 'on' : ''}"${k != 'USD' && !LOCAL ? ' disabled title="汇率需经本地代理取得"' : ''}>${n}</button>`
+      )
+      .join('')}</div>`,
+    fxNote =
+      trCcy == 'USD'
+        ? ''
+        : fx.busy
+          ? `<div class="mnote sm">正在取${CCY[trCcy][0]}汇率…（暂按美元显示）</div>`
+          : fx.err
+            ? `<div class="mnote sm">取不到${CCY[trCcy][0]}汇率：${fx.err}（按美元显示）</div>`
+            : '',
+    tools = `<div class="tbar">${chip('tr', '图上显示')}<span class="sp"></span><button class="chip" id="trv" title="逐笔复盘：开仓时的大周期、入场位置、止损、情景">复盘</button><button class="chip" id="trr" title="重新拉取交易记录">${TRL ? '<i class="spin"></i>' : ''}刷新</button></div>
+<div class="tbar trcy"><span class="mu sm">金额币种</span>${ccySeg}</div>${fxNote}`;
   /* 模拟交易标明来源，免得误认为真实账户 */
   const demo =
     TR && TR.demo
@@ -125,13 +197,13 @@ function trPanel() {
   if (TR.err) return tools + `<div class="empty">${TR.err}</div>`;
   const c = TR.closed,
     w = c.filter(t => t.netProfit > 0).length,
-    net = c.reduce((s, t) => s + t.netProfit, 0),
+    [net, netC] = moneySum(c),
     hold = c.length ? c.reduce((s, t) => s + (t.closeTs - t.openTs), 0) / c.length / 36e5 : null,
     op =
       TR.open
         .map(
           (p, i) =>
-            `<div class="sg${on('o|' + p.id)}" data-key="o|${p.id}" data-tro="${i}" title="点击在图上定位，再点取消"><div class="r1">${side(p)}<span>${+p.units.toFixed(4)} @${f(p.openRate)}</span>${p.pnl != null ? `<b class="r" style="color:${dc(p.pnl)}">${sg(p.pnl)}</b>` : ''}</div>
+            `<div class="sg${on('o|' + p.id)}" data-key="o|${p.id}" data-tro="${i}" title="点击在图上定位，再点取消"><div class="r1">${side(p)}<span>${+p.units.toFixed(4)} @${f(p.openRate)}</span>${p.pnl != null ? `<b class="r" style="color:${dc(p.pnl)}">${money(p.pnl)}</b>` : ''}</div>
 <div class="mu sm">${fmt('1h', p.openTs)}${p.sl > 0 ? ` · 止损 ${f(p.sl)}` : ''}${p.tp > 0 ? ` · 止盈 ${f(p.tp)}` : ''}</div></div>`
         )
         .join('') || '<div class="empty">当前没有该品种持仓</div>',
@@ -141,7 +213,7 @@ function trPanel() {
         .reverse()
         .map(
           t =>
-            `<div class="sg${on('c|' + t.id)}" data-key="c|${t.id}" data-trc="${c.indexOf(t)}" title="点击在图上定位，再点取消"><div class="r1">${side(t)}<span>${f(t.openRate)} → ${f(t.closeRate)}</span><b class="r" style="color:${dc(t.netProfit)}">${sg(t.netProfit)}</b></div>
+            `<div class="sg${on('c|' + t.id)}" data-key="c|${t.id}" data-trc="${c.indexOf(t)}" title="点击在图上定位，再点取消"><div class="r1">${side(t)}<span>${f(t.openRate)} → ${f(t.closeRate)}</span><b class="r" style="color:${dc(t.netProfit)}">${money(t.netProfit, t.closeTs)}</b></div>
 <div class="mu sm">${fmt('1h', t.openTs)} – ${fmt('1h', t.closeTs)} · ${+t.units.toFixed(4)} 单位 · ${t.leverage}x</div></div>`
         )
         .join('') || '<div class="empty">近一年没有该品种的已平仓交易</div>';
@@ -149,7 +221,7 @@ function trPanel() {
     tools +
     demo +
     `<div class="stats"><div class="stat"><span>近一年已平仓</span><b>${c.length} 笔</b></div><div class="stat"><span>胜率</span><b>${c.length ? Math.round((w / c.length) * 100) + '%' : '—'}</b></div>
-<div class="stat"><span>净盈亏</span><b style="color:${dc(net)}">${sg(net)}</b></div><div class="stat"><span>平均持仓</span><b>${fmtHold(hold)}</b></div></div>` +
+<div class="stat"><span>净盈亏（${CCY[netC][0]}）</span><b style="color:${dc(net)}">${fmtMoney(net, netC)}</b></div><div class="stat"><span>平均持仓</span><b>${fmtHold(hold)}</b></div></div>` +
     blk('tro', `当前持仓 <span class="n">${TR.open.length}</span>`, op) +
     blk('trc', `最近平仓 <span class="n">${Math.min(10, c.length)}</span>`, cl)
   );
