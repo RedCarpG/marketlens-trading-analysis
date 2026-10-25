@@ -273,6 +273,23 @@ function hlScene(c, fromChart) {
   markSel(fromChart);
   flashHl(mv);
 }
+/* 经济事件（日历里已过去的一行，或图上的事件标注）：竖条高亮公布时间所在的K线并定位；不在已加载K线范围内的不处理 */
+function hlEvent(e, fromChart) {
+  if (!e || !e.ts || !bars.length) return;
+  const key = 'e|' + e.id;
+  if (hlSel === key) return clearHl();
+  const s = snapTs(e.ts),
+    i = s ? bars.findIndex(b => b.timestamp === s) : -1;
+  if (i < 0 || e.ts >= nxt(tf, bars[bars.length - 1].timestamp)) return;
+  clearHl();
+  hlSel = key;
+  hlTxt = `${evName(e)} · ${fmt('1h', e.ts)}${e.actual ? ' · 公布 ' + e.actual : ''}`;
+  hlBands(s, bars[i].close);
+  hlLoc = () => ensureVisible(i);
+  const mv = hlLoc();
+  markSel(fromChart);
+  flashHl(mv);
+}
 /* ===== 高亮图形与闪烁 =====
    hlOv：画一个随高亮一起清除的图形，并记下它的初始样式，供 flashHl 闪烁。
    hlBands：竖条同时画在主图和所有打开的副图（MACD、RSI 等）上，指标里也能看到选中的是哪根K线。

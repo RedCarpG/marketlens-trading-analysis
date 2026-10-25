@@ -12,7 +12,7 @@ let chart,
   scheme = LS.get('scheme', 'intl'),
   /* 第一次打开（本地没有保存过）时：深色主题；图上不画价格行为情景（面板里照常列出，可在“标注”菜单或情景块标题打开） */
   theme = LS.get('theme', 'dark'),
-  MK = { hl: 1, sr: 1, ar: 1, pl: 0, tr: 1, ...LS.get('marks', {}) },
+  MK = { hl: 1, sr: 1, ar: 1, pl: 0, tr: 1, ev: 1, ...LS.get('marks', {}) },
   /* PCOL：右侧面板收起成图标条；WCOL：左侧自选收起成竖窄条（都记在本地）；FOCUS：专注模式（只看K线，不记） */
   PCOL = LS.get('pnCol', 0),
   WCOL = LS.get('wlCol', 0),
@@ -153,6 +153,7 @@ async function load() {
   for (const k in ALL) C[k] = ctx(k, ALL[k]);
   show();
   loadTrades();
+  if (TAB == 'ev') loadNews();
 }
 function show() {
   bars = ALL[tf];
@@ -396,6 +397,7 @@ function init() {
     ar: '近期信号的位置',
     pl: '情景的入场 / 止损 / 目标',
     tr: '我的开平仓、持仓与止损止盈',
+    ev: '非农、CPI、FOMC 等高影响事件的公布时间',
   };
   $('#mks').innerHTML =
     '<div class="mh">图上标注</div>' +
@@ -628,6 +630,7 @@ function init() {
   initPanel();
   wl();
   load();
+  loadEvents();
 }
 init();
 

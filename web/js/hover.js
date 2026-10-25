@@ -46,6 +46,7 @@ function hovHTML(i) {
                   : '阴线',
     sg = lastM ? lastM.t.a.sigs.filter(g => g.i === i) : [],
     forming = i === bars.length - 1 && nxt(tf, b.timestamp) > Date.now(),
+    evs = evHover(b),
     trs =
       TR && TR.sym === cur.sym
         ? [
@@ -61,6 +62,7 @@ function hovHTML(i) {
 ${p ? `<div class="row"><span>涨跌</span><b style="color:${dc(chg)}">${chg >= 0 ? '+' : ''}${f(chg)}（${chg >= 0 ? '+' : ''}${((chg / p.close) * 100).toFixed(2)}%）</b></div>` : ''}
 <div class="row"><span>振幅</span><b>${f(rg)}${a ? ` · ${(rg / a).toFixed(1)} ATR` : ''}</b></div><div class="row"><span>形态</span><b>${shape}</b></div>
 ${hasVol(bars) ? `<div class="row"><span>成交量</span><b>${b.volume.toLocaleString()}</b></div>` : ''}
+${evs ? `<div class="hs hev">${evs}</div>` : ''}
 ${
   sg.length || trs.length
     ? `<div class="hs">${sg.map(g => `<div><span style="color:${dc(g.dir)}">${g.dir > 0 ? '▲' : '▼'}</span> ${g.t}</div>`).join('')}
