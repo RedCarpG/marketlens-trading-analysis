@@ -15,7 +15,7 @@ const SHORT = {
   收盘跌破布林下轨: '破下轨',
 };
 const KEYSIG = new Set(['金叉', '死叉', '破上轨', '破下轨']); // 这几类总是标出；其余信号只在靠近关键价位时标出
-const MKN = { hl: '前高前低', sr: '支撑阻力', ar: '信号箭头', pl: '情景', tr: '我的交易' };
+const MKN = { hl: '前高前低', sr: '支撑阻力', ar: '信号箭头', pl: '情景', tr: '我的交易', ev: '经济事件' };
 /* “标注”菜单里每个开关前的小图例，与图上画法一致 */
 const SW = {
   hl: '<path d="M5 5h17" style="stroke:var(--dn);stroke-dasharray:1.5 3;stroke-width:1.5"/><path d="M5 1l3 4-3 4-3-4z" style="fill:var(--dn)"/>',
@@ -23,6 +23,7 @@ const SW = {
   ar: '<path d="M6 2l4 7H2z" style="fill:var(--up)"/><path d="M16 8l4-7h-8z" style="fill:var(--dn)"/>',
   pl: '<rect x="1" width="21" height="5" style="fill:var(--up);opacity:.5"/><rect x="1" y="5" width="21" height="5" style="fill:var(--dn);opacity:.5"/><path d="M1 5h21" style="stroke:var(--ac);stroke-width:1.5"/>',
   tr: '<path d="M5 2l4 7H1z" style="fill:var(--tb)"/><path d="M8 6l9-3" style="stroke:var(--up);stroke-width:1.5"/><circle cx="18.5" cy="3" r="2.2" style="fill:none;stroke:var(--up);stroke-width:1.5"/>',
+  ev: '<path d="M8 0v10" style="stroke:var(--mu);stroke-dasharray:1.5 2;stroke-width:1.2"/><rect x="2" y="5.5" width="12" height="4.5" rx="1.5" style="fill:none;stroke:var(--mu);stroke-width:1.1"/>',
 };
 /* 点击“近期信号”时自动打开的相关指标 */
 const SIGIND = {
@@ -52,6 +53,7 @@ const TXT = {
    情景      从触发K线起的盈亏框：目标一侧涨色框、止损一侧跌色框，入场实线 + 空心标签
    我的交易  买=蓝色▲、卖=橙色▼（与涨跌色区分），开平仓之间按盈亏着色的实线，平仓空心圆 + 实心盈亏标签
    我的持仓  粗实线 + 实心标签；我的止损/止盈为虚线 + 空心标签
+   经济事件  公布时间所在K线上的竖点线（弱化色）+ 底部空心小标签（非农、CPI、FOMC…）
    右侧所有价位标签统一由标签层绘制，自动上下错开，不再互相压住 */
 const TRC = [
     ['#2f6fd6', '#d9822b'],
@@ -233,6 +235,43 @@ function regOverlays() {
         ignoreEvent: true,
       });
     return r;
+  });
+  /* 经济事件：竖点线贯穿主图，底部空心小标签（row=1 的抬高一行，与相邻的错开）；标签可点击高亮。K线很密时只画线 */
+  ov('fbEvent', 2, ({ overlay, coordinates, bounding, barSpace }) => {
+    const e = overlay.extendData,
+      x = coordinates[0].x,
+      fg = [
+        {
+          type: 'line',
+          attrs: {
+            coordinates: [
+              { x, y: 0 },
+              { x, y: bounding.height },
+            ],
+          },
+          styles: { style: 'dashed', dashedValue: [1.5, 3], size: 1, color: e.color + '88' },
+          ignoreEvent: true,
+        },
+      ];
+    if (!barSpace || barSpace.gapBar >= 3)
+      fg.push({
+        type: 'text',
+        attrs: { x, y: bounding.height - 6 - e.row * 19, text: e.text, align: 'center', baseline: 'bottom' },
+        styles: {
+          ...TXT,
+          size: 11,
+          color: e.color,
+          backgroundColor: e.bg + 'dd',
+          borderColor: e.color + '99',
+          borderSize: 1,
+          borderRadius: 3,
+          paddingLeft: 4,
+          paddingRight: 4,
+          paddingTop: 1,
+          paddingBottom: 1,
+        },
+      });
+    return fg;
   });
   /* 最新K线分界：最新一根K线右边缘画一条竖虚线，右侧（还没走出来的区域）铺一层淡淡的强调色，主图和各副图都画 */
   ov('fbNow', 2, ({ overlay, coordinates, bounding, barSpace }) => {
@@ -696,6 +735,7 @@ function drawMarks(m) {
       });
     }
   }
+  items.push(...evMarks());
   if (labs.length)
     items.push({
       name: 'fbLabels',
