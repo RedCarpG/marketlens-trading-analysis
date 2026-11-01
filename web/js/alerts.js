@@ -26,14 +26,14 @@ let AL = { on: 0, lv: 1, sc: 1, sl: 1, ev: 1, ...LS.get('alerts', {}) },
   alArm = {},
   alSc = null,
   alKey = '';
-function alArmCheck(k, near, far, msg, kind) {
+function alArmCheck(k, near, far, msg, kind, say) {
   if (!(k in alArm)) {
     alArm[k] = !near;
     return;
   }
   if (alArm[k] && near) {
     alArm[k] = false;
-    alFire(msg, kind);
+    alFire(msg, kind, say);
   } else if (!alArm[k] && far) alArm[k] = true;
 }
 function evalAlerts(m) {
@@ -57,7 +57,8 @@ function evalAlerts(m) {
         d <= x * 0.15,
         d >= x * 0.5,
         `${cur.sym} ${tf} 价格 ${f(now)} 到达${l.p < now ? '支撑' : '阻力'} ${f(l.p)}（${l.tfs.join('·')}${l.touch >= 3 ? ` · 挡回${l.touch}次` : ''}）`,
-        'lv'
+        'lv',
+        `${ciName()} 到了${l.p < now ? '支撑' : '阻力'} ${f(l.p)} 附近`
       );
     });
   }
@@ -75,10 +76,16 @@ function evalAlerts(m) {
         if (!p && g.state == '已触发')
           alFire(
             `${cur.sym} ${tf} 情景触发：${dn}，入场 ${f(g.entry)} / 止损 ${f(g.stop)} / 目标 ${f(g.tgt)}（1:${g.rr.toFixed(1)}）`,
-            'sc'
+            'sc',
+            `${ciName()} ${TFN[tf]}出现${dn}，入场 ${f(g.entry)}，止损 ${f(g.stop)}`
           );
         else if (p == '已触发' && g.state != '已触发')
-          alFire(`${cur.sym} ${tf} 情景${g.state}：${dn}（入场 ${f(g.entry)}）`, 'sc');
+          alFire(
+            `${cur.sym} ${tf} 情景${g.state}：${dn}（入场 ${f(g.entry)}）`,
+            'sc',
+            `${ciName()} ${TFN[tf]}那个${dn}${g.state.replace(/（.*?）/g, '')}了`,
+            'scx'
+          );
       });
     alSc = cur2;
   }
@@ -97,13 +104,15 @@ function evalAlerts(m) {
           d <= x * 0.5,
           d >= x,
           `${cur.sym} 价格 ${f(now)} 接近我的${n} ${f(v)}（相距 ${(d / x).toFixed(1)} ATR，触及约 ${money(pl)}）`,
-          n == '止损' ? 'dn' : 'up'
+          n == '止损' ? 'dn' : 'up',
+          `${ciName()} 离你的${n} ${f(v)} 只差 ${(d / x).toFixed(1)} 个 ATR`
         );
       })
     );
 }
-/* 发出提醒：页面右下角弹出提示 + 系统通知（已授权时）+ 记入最近预警；不在预警页时“预警”标签计未读 */
-function alFire(text, kind) {
+/* 发出提醒：页面右下角弹出提示 + 系统通知（已授权时）+ 记入最近预警 + 交给桌宠 Cirra（勾选了这一类时，见 cirra.js）；
+   不在预警页时“预警”标签计未读。say 为给 Cirra 念的短句（没有时念 text），ck 为交给她的类型（决定表情，默认同 kind） */
+function alFire(text, kind, say, ck = kind) {
   alLog.unshift({ t: Date.now(), text, kind });
   alLog = alLog.slice(0, 20);
   if (TAB != 'al') alNew++;
@@ -112,6 +121,7 @@ function alFire(text, kind) {
     try {
       new Notification('MarketLens 预警', { body: text, tag: text });
     } catch (_) {}
+  cirraSay(say || text, ck);
 }
 function toast(text, kind) {
   let box = $('#toasts');

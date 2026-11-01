@@ -1661,6 +1661,24 @@ details[open]::details-content {
   border: 1px solid var(--bd);
   border-radius: var(--r);
 }
+/* Cirra 播报（cirra.js）：标题行多一个“试一下”；总开关关着时四个勾选变淡 */
+.alh.ci {
+  margin-top: 14px;
+}
+.alh.ci > div {
+  flex: 1;
+  min-width: 0;
+}
+.ciok {
+  color: var(--up);
+}
+.cino {
+  color: #d9822b;
+  cursor: help;
+}
+.opts.off {
+  opacity: 0.5;
+}
 .opts {
   padding: 0 12px;
   border: 1px solid var(--bd);

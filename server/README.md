@@ -23,6 +23,8 @@
 | `GET /api/etoro/positions?symbol=` | 我的当前持仓（含浮动盈亏、止损止盈）；给了 symbol 只返回该品种 |
 | `GET /api/events/calendar` | 经济日历与 BLS 最新官方数据，见下文“经济日历与新闻” |
 | `GET /api/events/news?topic=&lang=` | 新闻，`topic` 为 gold / btc / macro，`lang` 为 zh / en |
+| `GET /api/cirra/status` | 桌宠 Cirra 开没开，见下文“桌宠 Cirra 播报” |
+| `POST /api/cirra/notify` | 让 Cirra 说一句 `{ text, kind }`；代理唯一收 POST 的地址 |
 | `GET /api/store` | 本地K线存储概况：每个品种/周期已存根数与起止时间 |
 | `GET /api/health` | 是否已配置行情密钥（keys）、交易密钥（trade）、实时报价口径 |
 
@@ -68,6 +70,15 @@
 - 返回：最近 8 天及以后的全部事件，更早的只返回高影响事件；每个来源的最后成功时间和错误（`sources`），页面据此显示覆盖情况。
 - 时区：美国的发布时间按美东时间换算成 UTC（夏令时由 Node 的 Intl 处理），测试覆盖了美欧夏令时错开的那几周。
 - **未经真实环境联调**：开发环境的网络不允许访问这些站点，解析按各来源公开的格式编写并用样例测试（`tests/events.test.js`）。第一次在本机运行时，看页面“事件”页顶部的来源状态；某个来源报错（如 BLS 返回 403）时，按 `.env.example` 设置 `EVENTS_UA`。
+
+## 桌宠 Cirra 播报（server/cirra.js）
+
+用户的桌宠 Cirra（仓库 cirra-deskpet）开着时在本机事件端口收 `POST /notify`；端口和每次启动生成的 token 写在 `~/.cirra/endpoint.json`（`.env` 的 `CIRRA_ENDPOINT_FILE` 可改，和 Cirra 用同一个变量名）。她故意不让网页直接调，所以页面的预警交给代理，由代理转给她。
+
+- 发送：每次重读 endpoint 文件，带 `X-Cirra-Token`、`Content-Type: application/json` 发到 `http://127.0.0.1:<端口>/notify`，请求体 `{ text, emotion }`（text 压成一行、截到 200 字；不传 title）。401 时重读一次文件再试（她刚重启）；文件不在或连不上 = 她没开，回 `{ ok: false, reason: "Cirra 没开" }`，不报错。每分钟最多 8 条，超出的不发。
+- `POST /api/cirra/notify`：必须带本机页面的 `Origin`（外站网页发不了：不回 CORS 头，预检过不去）、`Content-Type: application/json`、请求体 ≤ 4 KB；`kind` 为 `lv`（价位）/ `sc`（情景触发）/ `scx`（情景失效、到目标）/ `dn`（接近我的止损）/ `up`（接近我的止盈）/ `ev`（经济事件）/ `test`（试一下），表情由代理按 kind 定，不收页面传来的表情。她没开时也回 200（`ok: false`）。
+- `GET /api/cirra/status`：对她的端口发一次 GET，她回 405（只收 POST）即在线；不带 token，不会让她说话。
+- 她那边：推来的话进她的通知模组（免打扰、专注时段、全屏时先攒着，排着几条时合成一句，提醒方式可选说出来 / 只显示 / 只记录 / 关）。想让这个来源叫“行情”，在 Cirra 本机的 `sidecar/local.json` 写 `{ "notifyLabel": "行情" }`。
 
 ## 本地K线存储
 
