@@ -234,6 +234,29 @@ function evMarks() {
     };
   });
 }
+/* 未来区域的悬停卡：离鼠标 24 像素内最近的那条未来事件竖线，同一位置的事件都列出（未开“经济事件”标注时不显示） */
+function evFutHover(mx) {
+  if (!MK.ev || !EV || !EV.events || mx == null) return '';
+  const t1 = nxt(tf, bars[bars.length - 1].timestamp),
+    big = /[dwM]$/.test(tf),
+    now = Date.now(),
+    es = EV.events.filter(e => evHot(e) && e.ts >= t1 && !(big && !EVBIG.includes(e.rel)));
+  let best = -1,
+    bd = 24;
+  es.forEach(e => {
+    const i = futIdx(bars, e.ts),
+      d = Math.abs(chart.convertToPixel({ dataIndex: i, value: bars[0].close }, { paneId: 'candle_pane' }).x - mx);
+    if (d < bd) [best, bd] = [i, d];
+  });
+  if (best < 0) return '';
+  const g = es.filter(e => futIdx(bars, e.ts) == best).sort((a, b) => a.ts - b.ts);
+  return `<div class="hh"><b>${evDay(g[0].ts)}</b><span class="tag" style="margin:0">未公布 · 还有 ${evLeft(g[0].ts - now)}</span></div><div class="hs hev">${g
+    .map(
+      e =>
+        `<div><span class="evf i${e.imp}"></span>${evTime(e.ts)} ${esc(evName(e))}${e.forecast ? ` <span class="mu">预期 ${esc(e.forecast)}</span>` : ''}${e.previous ? ` <span class="mu">前值 ${esc(e.previous)}</span>` : ''}</div>`
+    )
+    .join('')}</div>`;
+}
 /* 悬停信息卡：这根K线时间内的相关事件（中高影响），最多 4 条 */
 function evHover(b) {
   if (!EV || !EV.events) return '';

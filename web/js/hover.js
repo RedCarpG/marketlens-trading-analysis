@@ -71,6 +71,17 @@ ${trs.map(([t, w]) => `<div><span style="color:var(${t.isBuy ? '--tb' : '--ts'})
 }`;
 }
 function onHover(d) {
+  /* 最新K线右边的未来区域没有K线：鼠标靠近未来事件的竖线或标签时显示事件卡 */
+  if (d && d.realDataIndex >= bars.length && bars.length) {
+    const html = evFutHover(d.x);
+    if (!html) return hideHover();
+    hovI = -1;
+    chart.removeOverlay({ groupId: 'hov' });
+    $('#hov').innerHTML = html;
+    $('#hov').style.display = 'block';
+    placeHover();
+    return;
+  }
   const i = d && d.dataIndex;
   if (i == null || i < 0 || i >= bars.length || !d.kLineData) {
     hideHover();
