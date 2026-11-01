@@ -278,9 +278,26 @@ function hlEvent(e, fromChart) {
   if (!e || !e.ts || !bars.length) return;
   const key = 'e|' + e.id;
   if (hlSel === key) return clearHl();
+  /* 未来事件：K线还不存在，只把它所在的位置滚到画面里 */
+  if (e.ts >= nxt(tf, bars[bars.length - 1].timestamp)) {
+    clearHl();
+    hlSel = key;
+    hlTxt = `${evName(e)} · ${fmt('1h', e.ts)} · 未公布`;
+    const idx = futIdx(bars, e.ts);
+    hlLoc = () => {
+      const x = chart.convertToPixel({ dataIndex: idx, value: bars[0].close }, { paneId: 'candle_pane' }).x,
+        w = chart.getSize('candle_pane', 'main').width,
+        d = w - Math.min(safeR(), w * 0.4) - 60 - x;
+      if (d < 0) chart.scrollByDistance(d, 300);
+      return 0;
+    };
+    hlLoc();
+    markSel(fromChart);
+    return;
+  }
   const s = snapTs(e.ts),
     i = s ? bars.findIndex(b => b.timestamp === s) : -1;
-  if (i < 0 || e.ts >= nxt(tf, bars[bars.length - 1].timestamp)) return;
+  if (i < 0) return;
   clearHl();
   hlSel = key;
   hlTxt = `${evName(e)} · ${fmt('1h', e.ts)}${e.actual ? ' · 公布 ' + e.actual : ''}`;

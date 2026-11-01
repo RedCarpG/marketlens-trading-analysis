@@ -184,30 +184,55 @@ function evDataAlert() {
   evDataRef = ref;
 }
 
-/* ===== 图上标注：相关货币的高影响事件，在公布时间所在的K线上画竖点线 + 底部简称（同一根K线的合成一个）。
-   日线及以上只标非农、CPI、FOMC，免得每周的初请等把图铺满；相邻的标签分两行错开 ===== */
+/* ===== 图上标注：相关货币的高影响事件，在公布时间所在的K线上画竖线 + 底部简称（同一根K线的合成一个）。
+   非农、CPI、FOMC 最醒目（琥珀色实心标签、粗线）；其他高影响事件为空心标签、细点线。
+   还没公布的画在最新K线右边的未来区域（虚线，标签带日期；位置按平均K线间隔估算，因为这些K线还不存在）；
+   最近的一个未来事件在画面外时，标签钉在右边缘。
+   日线及以上只标非农、CPI、FOMC、PCE、GDP，免得每周的初请等把图铺满；相邻的标签分两行错开 ===== */
+const EVTOP = ['empsit', 'cpi', 'fomc'],
+  EVBIG = [...EVTOP, 'pce', 'gdp'];
 function evMarks() {
   if (!MK.ev || !EV || !EV.events || !bars.length) return [];
   const t0 = bars[0].timestamp,
     t1 = nxt(tf, bars[bars.length - 1].timestamp),
+    now = Date.now(),
     big = /[dwM]$/.test(tf),
     g = new Map();
-  EV.events.forEach(e => {
-    if (!evHot(e) || e.ts < t0 || e.ts >= t1 || (big && !['empsit', 'cpi', 'fomc'].includes(e.rel))) return;
-    const s = snapTs(e.ts),
-      o = g.get(s) || { e, ns: [] },
-      n = evShort(e);
-    if (!o.ns.includes(n)) o.ns.push(n);
-    g.set(s, o);
-  });
-  const color = cssv('--mu'),
+  EV.events
+    .filter(e => evHot(e) && e.ts >= t0 && !(big && !EVBIG.includes(e.rel)))
+    .sort((a, b) => a.ts - b.ts)
+    .forEach(e => {
+      const out = e.ts >= t1,
+        k = out ? 'f' + futIdx(bars, e.ts) : snapTs(e.ts),
+        o = g.get(k) || { e, ns: [], out, top: 0, fut: e.ts > now },
+        n = evShort(e);
+      if (!o.ns.includes(n)) o.ns.push(n);
+      if (EVTOP.includes(e.rel)) o.top = 1;
+      g.set(k, o);
+    });
+  const hot = DARK[theme] ? '#ffb020' : '#c77700',
+    color = cssv('--tx'),
     bg = cssv('--pn');
-  return [...g].map(([ts, { e, ns }], i) => ({
-    name: 'fbEvent',
-    points: [{ timestamp: ts, value: bars[0].close }],
-    onClick: ovClick(() => hlEvent(e, 1)),
-    extendData: { color, bg, row: i % 2, text: ns.slice(0, 3).join('·') + (ns.length > 3 ? '…' : '') },
-  }));
+  let pinned = 0;
+  return [...g].map(([k, { e, ns, out, top, fut }], i) => {
+    const d = new Date(e.ts),
+      when = `${d.getMonth() + 1}/${d.getDate()}${big ? '' : ' ' + evTime(e.ts)}`,
+      pin = fut && !pinned++;
+    return {
+      name: 'fbEvent',
+      points: [out ? { dataIndex: futIdx(bars, e.ts), value: bars[0].close } : { timestamp: k, value: bars[0].close }],
+      onClick: ovClick(() => hlEvent(e, 1)),
+      extendData: {
+        color: top ? hot : color,
+        bg,
+        top,
+        fut,
+        pin,
+        row: i % 2,
+        text: ns.slice(0, 3).join('·') + (ns.length > 3 ? '…' : '') + (fut ? ' ' + when : ''),
+      },
+    };
+  });
 }
 /* 悬停信息卡：这根K线时间内的相关事件（中高影响），最多 4 条 */
 function evHover(b) {

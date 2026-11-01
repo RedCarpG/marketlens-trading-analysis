@@ -236,41 +236,59 @@ function regOverlays() {
       });
     return r;
   });
-  /* 经济事件：竖点线贯穿主图，底部空心小标签（row=1 的抬高一行，与相邻的错开）；标签可点击高亮。K线很密时只画线 */
+  /* 经济事件：竖线贯穿主图，底部小标签（row=1 的抬高一行，与相邻的错开），可点击高亮。
+     top（非农、CPI、FOMC）：粗线 + K线宽的淡色竖带 + 实心标签，K线很密时也留标签；其他：细点线 + 空心标签，K线很密时只画线。
+     fut（未公布）：虚线；pin（最近的未来事件）画到画面右边缘外时，只把标签钉在右边缘 */
   ov('fbEvent', 2, ({ overlay, coordinates, bounding, barSpace }) => {
     const e = overlay.extendData,
       x = coordinates[0].x,
-      fg = [
-        {
-          type: 'line',
-          attrs: {
-            coordinates: [
-              { x, y: 0 },
-              { x, y: bounding.height },
-            ],
+      edge = bounding.width - RIN - 8,
+      off = e.pin && x > edge,
+      fg = [],
+      label = (lx, align, text) =>
+        fg.push({
+          type: 'text',
+          attrs: { x: lx, y: bounding.height - 6 - e.row * 22, text, align, baseline: 'bottom' },
+          styles: {
+            ...TXT,
+            size: e.top ? 13 : 11,
+            weight: e.top ? 700 : 400,
+            color: e.top ? '#1a1205' : e.color,
+            backgroundColor: e.top ? e.color : e.bg + 'dd',
+            borderColor: e.top ? e.color : e.color + '99',
+            borderSize: 1,
+            borderRadius: 3,
+            paddingLeft: 5,
+            paddingRight: 5,
+            paddingTop: e.top ? 2 : 1,
+            paddingBottom: e.top ? 2 : 1,
           },
-          styles: { style: 'dashed', dashedValue: [1.5, 3], size: 1, color: e.color + '88' },
-          ignoreEvent: true,
-        },
-      ];
-    if (!barSpace || barSpace.gapBar >= 3)
+        });
+    if (off) {
+      label(edge, 'right', e.text + ' →');
+      return fg;
+    }
+    if (e.top && barSpace)
       fg.push({
-        type: 'text',
-        attrs: { x, y: bounding.height - 6 - e.row * 19, text: e.text, align: 'center', baseline: 'bottom' },
-        styles: {
-          ...TXT,
-          size: 11,
-          color: e.color,
-          backgroundColor: e.bg + 'dd',
-          borderColor: e.color + '99',
-          borderSize: 1,
-          borderRadius: 3,
-          paddingLeft: 4,
-          paddingRight: 4,
-          paddingTop: 1,
-          paddingBottom: 1,
-        },
+        type: 'rect',
+        attrs: { x: x - barSpace.bar / 2, y: 0, width: barSpace.bar, height: bounding.height },
+        styles: { style: 'fill', color: e.color + '1c' },
+        ignoreEvent: true,
       });
+    fg.push({
+      type: 'line',
+      attrs: {
+        coordinates: [
+          { x, y: 0 },
+          { x, y: bounding.height },
+        ],
+      },
+      styles: e.top
+        ? { style: e.fut ? 'dashed' : 'solid', dashedValue: [5, 4], size: 1.5, color: e.color + 'cc' }
+        : { style: 'dashed', dashedValue: e.fut ? [4, 4] : [1.5, 3], size: 1, color: e.color + '99' },
+      ignoreEvent: true,
+    });
+    if (!barSpace || barSpace.gapBar >= (e.top ? 1 : 3)) label(x, 'center', e.text);
     return fg;
   });
   /* 最新K线分界：最新一根K线右边缘画一条竖虚线，右侧（还没走出来的区域）铺一层淡淡的强调色，主图和各副图都画 */

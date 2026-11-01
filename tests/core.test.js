@@ -142,6 +142,13 @@ test('analyze：不足 60 根返回 null', () => {
   assert.equal(analyze(Array.from({ length: 59 }, (_, i) => bar(i * H, 1, 1, 1, 1))), null);
 });
 
+test('futIdx：未来时刻按平均K线间隔落到最新K线之后', () => {
+  const futIdx = loadCore()('futIdx'),
+    bs = Array.from({ length: 11 }, (_, i) => ({ timestamp: i * H }));
+  assert.equal(futIdx(bs, 13 * H), 13);
+  assert.equal(futIdx(bs, 10.1 * H), 11); // 至少在最新K线之后一根
+});
+
 test('fxAt / fmtMoney：取当日或之前最近一天的汇率；金额带币种符号', () => {
   const get = loadCore(),
     fxAt = get('fxAt'),

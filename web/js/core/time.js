@@ -10,6 +10,13 @@ const bkt = (tf, t) => {
   if (tf == '1w') return Math.floor((t - 3456e5) / 6048e5) * 6048e5 + 3456e5;
   return Math.floor(t / STEP[tf]) * STEP[tf];
 };
+/* 未来时刻 ts 大约落在第几根K线：按最近 100 根的实际平均间隔估算（已含休市），至少在最新K线之后一根 */
+const futIdx = (bs, ts) => {
+  const n = bs.length,
+    k = Math.min(100, n - 1),
+    avg = k > 0 ? (bs[n - 1].timestamp - bs[n - 1 - k].timestamp) / k : 864e5;
+  return n - 1 + Math.max(1, Math.round((ts - bs[n - 1].timestamp) / avg));
+};
 const nxt = (tf, t) => {
   if (tf == '1M') {
     const d = new Date(t);
