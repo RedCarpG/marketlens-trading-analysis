@@ -189,7 +189,11 @@ test('代理 /api/cirra/notify：只收本机页面的 JSON；表情按 kind 定
     file = path.join(d, 'endpoint.json'),
     c = await fakeCirra('t');
   writeEp(file, c.port, 't');
-  const { p, port } = await startProxy({ CIRRA_ENDPOINT_FILE: file, EVENTS_DIR: path.join(d, 'ev') });
+  const { p, port } = await startProxy({
+    CIRRA_ENDPOINT_FILE: file,
+    EVENTS_DIR: path.join(d, 'ev'),
+    CIRRA_EVENTS: '0',
+  });
   const O = `http://127.0.0.1:${port}`,
     J = { 'content-type': 'application/json' },
     post = (headers, body) => req(port, 'POST', '/api/cirra/notify', { headers, body });
@@ -209,7 +213,7 @@ test('代理 /api/cirra/notify：只收本机页面的 JSON；表情按 kind 定
     );
     assert.deepEqual([ok.status, ok.json], [200, { ok: true }]);
     assert.deepEqual(c.got[0].body, { text: '离你的止损只差 0.4 个 ATR', emotion: 'worried' });
-    assert.deepEqual((await req(port, 'GET', '/api/cirra/status')).json, { running: true, file });
+    assert.deepEqual((await req(port, 'GET', '/api/cirra/status')).json, { running: true, file, announce: null });
     assert.equal((await req(port, 'POST', '/api/candles', { headers: { ...J, origin: O }, body: '{}' })).status, 405);
     /* 她关了：仍回 200，ok 为假 */
     fs.rmSync(file);

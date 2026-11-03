@@ -252,7 +252,7 @@ K线图铺满整个窗口作为背景，周围的块半透明（背景模糊）�
 - 事件不参与评分和情景，也没有回测；只用于提醒“这段时间可能有大波动”。
 - 未经真实环境联调：开发环境网络不允许访问这些站点，解析按公开格式编写、用样例测试（tests/events.test.js），并在浏览器里用模拟上游检查了页面。第一次在本机运行时以“事件”页顶部的来源状态为准。
 
-### 3.3.11 桌宠 Cirra 播报（2026-11-01，第①步）
+### 3.3.11 桌宠 Cirra 播报（2026-11-01 第①步，2026-11-03 第②步）
 
 用户的桌宠项目 Cirra（仓库 cirra-deskpet）能把消息说出来。计划与第②步（代理自己播报经济日历、每天早报）见 docs/CIRRA.md。
 
@@ -261,6 +261,7 @@ K线图铺满整个窗口作为背景，周围的块半透明（背景模糊）�
 - 页面（web/js/cirra.js）：alFire 多一个出口，只在预警总开关开着时有。预警页的“Cirra 播报”块：总开关（默认开）、她在不在（每 30 秒查一次）、上一条的结果、“试一下”；四个勾选——经济事件、我的止损 / 止盈默认开，关键价位、情景默认关（较频繁）。记在本地。公开演示页（不经代理）没有这一块。
 - 念的句子：每类预警另写一句口语化的短句（alFire 的 say），比如“黄金 GOLD 离你的止损 3990.00 只差 0.4 个 ATR”“FOMC 声明、联邦基金利率决议还有 30 分钟公布，联邦基金利率决议 预期 3.50%”“BLS 公布了：10 月非农减少 2.3 万，失业率 4.4%”；不传 title（她的来源名已经是“外部通知”，可在 Cirra 本机的 sidecar/local.json 写 `{ "notifyLabel": "行情" }` 改名）。
 - 验证：tests/cirra.test.js 用照她的端口规则写的假 Cirra 测发送格式、没开时跳过、token 更换、限速、状态，并起真的代理进程测接口的拒绝规则；另用 cirra-deskpet 自己的事件端口代码（sidecar/src/events/server.ts，tsx 运行）当真 Cirra，经代理发送各类预警，她都收下、表情正确；浏览器里检查了预警页这一块、勾选、试一下、她没开时的状态，以及事件提醒、BLS 新数、止盈提醒走真实路径交给她。她真正开口说话要在本机开着 Cirra 才能看到。
+- 第②步：代理自己播报经济日历（server/announce.js，页面关着也说，只要代理在跑）。Cirra 开着时（endpoint 文件在）每 30 秒看一次 events.calendar()：相关货币（`.env` 的 `CIRRA_CCY`，默认 USD）的高影响事件公布前 30 / 5 分钟各一句，同一时间合成一句；BLS 公布新的非农、CPI 月份时一句（说过的月份存 var/cirra.json，重启不重复；她没开时没说出去的 12 小时内补说）；每天本机时间到 `CIRRA_BRIEFING`（默认 07:00，留空不播）之后、她在时说一次今天还没公布的重要事件（日历没取到照实说没取到，日程里没有时只说“日程里没有”）。去重同页面预警（第一次看到时已在范围内的不说）。她没开时不看日历、不拉上游。`CIRRA_EVENTS=0` 关掉。开着时页面不再转“经济事件”（`/api/cirra/status` 的 `announce`），预警页那一项写“代理播报”。早报表情 neutral。已知取舍：代理不知道你在不在电脑前，到点后她在就说。验证：tests/announce.test.js；另用代理 + cirra-deskpet 的事件端口代码 + 模拟日历实跑，早报和公布前 30 分钟的提醒都送到、表情正确，页面不再重复转事件。
 
 ### 3.4 预警接口
 
@@ -379,7 +380,7 @@ web/
    ├─ highlight.js         点击高亮与定位
    ├─ trades.js            我的交易：拉取、时间对齐、面板
    ├─ events.js            经济日历、官方数据与新闻：事件页、分析页提示、图上标注与悬停、事件预警
-   ├─ cirra.js             桌宠 Cirra 播报：预警交给本地代理转给 Cirra、预警页的“Cirra 播报”块
+   ├─ cirra.js             桌宠 Cirra 播报：预警交给本地代理转给 Cirra、预警页的“Cirra 播报”块（代理自己的日历播报在 server/announce.js）
    ├─ hover.js             悬停高亮与信息卡
    ├─ chart-indicators.js  指标开关、配色、自定义绘制、页面自绘的图例、图表高度
    ├─ panel.js             周期矩阵与右侧面板（分析 / 交易 / 事件 / 预警标签页）
@@ -391,5 +392,5 @@ web/
 
 - 各文件共享全局作用域（普通脚本，非 ES 模块）：只有 app.js 末尾的 `init()` 和少量常量初始化在加载时执行，其余都是函数，调用时才互相引用，所以除“config.js 在前、app.js 最后”外顺序不敏感。
 - 代理只托管 `web/` 下的 html/css/js（路径规范化后必须仍在 web/ 内），旧地址 `/market-analyzer.html` 302 跳到首页。
-- 测试：项目根目录 `npm test`（Node 自带 node:test）。`tests/load-core.js` 在 vm 中按浏览器顺序加载 core/；`tests/golden.test.js` 对比 `tests/fixtures/golden-demo.json`（模拟数据，不含真实行情）；`tests/review.test.js` 验证复盘只用开仓前已收盘的K线并与 analyzeMTF 一致；`tests/store.test.js` 验证K线存储合并与读写；`tests/core.test.js` 为时间网格、已收盘判断、摆动点、前高前低、价位合并、情景触发（含收紧选项）、汇率取值与金额格式等单元测试；`tests/backtest.test.js` 验证回测不偷看未来、只限定入场区间、模拟成交规则、统计函数，并在随机游走数据上做空白对照；`tests/import-history.test.js` 验证历史导入的清洗、日期归一与周线/月线聚合；`tests/yahoo.test.js` 验证 Yahoo 数据的解析、清洗、日内对齐与聚合（不联网）；`tests/events.test.js` 验证经济日历与新闻（美东时间与夏令时换算、Forex Factory / BLS 日程 / RSS / Atom 解析、与官方日程核对合并、BLS 数值计算、缓存与失败回退、改期替换、公布后重查官方数据）；`tests/cirra.test.js` 验证桌宠 Cirra 播报（按她的协议发送、她没开时跳过、token 更换后重读、限速、状态，以及代理 `/api/cirra/notify` 的拒绝规则和按类型定表情）。回测命令行 `npm run backtest`（tools/backtest.js，读本地K线存储或 `--data` 指定的导入历史，结果写到 var/backtest/）；`npm run import`（tools/import-history.js）从 Yahoo（黄金期货日线）、Binance（分页）或 CSV 导入长周期历史到 var/history/；`npm run bt:compare`（tools/bt-compare.js）按事先定好的几组情景规则并行回放、计入成本对比。核心算法有意改动时需重新生成标准答案。
+- 测试：项目根目录 `npm test`（Node 自带 node:test）。`tests/load-core.js` 在 vm 中按浏览器顺序加载 core/；`tests/golden.test.js` 对比 `tests/fixtures/golden-demo.json`（模拟数据，不含真实行情）；`tests/review.test.js` 验证复盘只用开仓前已收盘的K线并与 analyzeMTF 一致；`tests/store.test.js` 验证K线存储合并与读写；`tests/core.test.js` 为时间网格、已收盘判断、摆动点、前高前低、价位合并、情景触发（含收紧选项）、汇率取值与金额格式等单元测试；`tests/backtest.test.js` 验证回测不偷看未来、只限定入场区间、模拟成交规则、统计函数，并在随机游走数据上做空白对照；`tests/import-history.test.js` 验证历史导入的清洗、日期归一与周线/月线聚合；`tests/yahoo.test.js` 验证 Yahoo 数据的解析、清洗、日内对齐与聚合（不联网）；`tests/events.test.js` 验证经济日历与新闻（美东时间与夏令时换算、Forex Factory / BLS 日程 / RSS / Atom 解析、与官方日程核对合并、BLS 数值计算、缓存与失败回退、改期替换、公布后重查官方数据）；`tests/cirra.test.js` 验证桌宠 Cirra 播报（按她的协议发送、她没开时跳过、token 更换后重读、限速、状态，以及代理 `/api/cirra/notify` 的拒绝规则和按类型定表情）；`tests/announce.test.js` 验证代理的日历播报（公布前 30 / 5 分钟、启动基准、她没开时不看日历、BLS 新数只说一次且重启不重复、早报每天一次、配置解析）。回测命令行 `npm run backtest`（tools/backtest.js，读本地K线存储或 `--data` 指定的导入历史，结果写到 var/backtest/）；`npm run import`（tools/import-history.js）从 Yahoo（黄金期货日线）、Binance（分页）或 CSV 导入长周期历史到 var/history/；`npm run bt:compare`（tools/bt-compare.js）按事先定好的几组情景规则并行回放、计入成本对比。核心算法有意改动时需重新生成标准答案。
 - 格式化：`npm run format`（Prettier 3.3.3，配置见 `.prettierrc.json`）。

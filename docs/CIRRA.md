@@ -1,6 +1,6 @@
 # 让桌宠 Cirra 播报预警与信息（计划，未实现）
 
-日期：2026-11-01。状态：第①步已完成（见 SPEC 3.3.11），第②步待做。分支 `ccr-bd0a1e8b-mxsb48`（从 main 0ae4158 重新起），在 worktree `.claude/worktrees/cirra-notify` 里做。
+日期：2026-11-01。状态：第①步（2026-11-01）、第②步（2026-11-03）都已完成，见 SPEC 3.3.11。分支 `ccr-bd0a1e8b-mxsb48`（从 main 0ae4158 重新起），在 worktree `.claude/worktrees/cirra-notify` 里做。
 
 ## 1. 要做什么
 

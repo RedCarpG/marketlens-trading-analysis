@@ -78,6 +78,7 @@
 - 发送：每次重读 endpoint 文件，带 `X-Cirra-Token`、`Content-Type: application/json` 发到 `http://127.0.0.1:<端口>/notify`，请求体 `{ text, emotion }`（text 压成一行、截到 200 字；不传 title）。401 时重读一次文件再试（她刚重启）；文件不在或连不上 = 她没开，回 `{ ok: false, reason: "Cirra 没开" }`，不报错。每分钟最多 8 条，超出的不发。
 - `POST /api/cirra/notify`：必须带本机页面的 `Origin`（外站网页发不了：不回 CORS 头，预检过不去）、`Content-Type: application/json`、请求体 ≤ 4 KB；`kind` 为 `lv`（价位）/ `sc`（情景触发）/ `scx`（情景失效、到目标）/ `dn`（接近我的止损）/ `up`（接近我的止盈）/ `ev`（经济事件）/ `test`（试一下），表情由代理按 kind 定，不收页面传来的表情。她没开时也回 200（`ok: false`）。
 - `GET /api/cirra/status`：对她的端口发一次 GET，她回 405（只收 POST）即在线；不带 token，不会让她说话。
+- 日历播报（server/announce.js，页面关着也说）：她开着时每 30 秒看一次日历，相关货币（`CIRRA_CCY`，默认 USD）的高影响事件公布前 30 / 5 分钟各一句、BLS 新的非农 / CPI 月份一句（存 `var/cirra.json`，重启不重复）、每天 `CIRRA_BRIEFING`（默认 07:00）后一次今日早报。`CIRRA_EVENTS=0` 关掉；开着时页面不再转经济事件，`/api/cirra/status` 返回 `announce: { ccy, briefing }`（关着为 null）。她没开时不看日历、不拉上游。
 - 她那边：推来的话进她的通知模组（免打扰、专注时段、全屏时先攒着，排着几条时合成一句，提醒方式可选说出来 / 只显示 / 只记录 / 关）。想让这个来源叫“行情”，在 Cirra 本机的 `sidecar/local.json` 写 `{ "notifyLabel": "行情" }`。
 
 ## 本地K线存储
