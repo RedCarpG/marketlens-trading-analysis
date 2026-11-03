@@ -12,7 +12,8 @@
    GET /api/events/news?topic=&lang=                    → 新闻（RSS，按主题和语言）
    GET /api/cirra/status                                → 桌宠 Cirra 开没开（见 cirra.js）
    POST /api/cirra/notify  { text, kind }               → 让 Cirra 把一条预警说出来
-   POST /api/ai/analyze    { prompt }                   → 请 Cirra 的 AI 分析一次（提问 + 分析包），回整段回答（只有这两个地址收 POST）
+   GET  /api/ai/log?sym=&tf=                            → AI 分析的记录（页面按之后的K线打分）
+   POST /api/ai/analyze    { prompt, meta }                   → 请 Cirra 的 AI 分析一次（提问 + 分析包），回整段回答（只有这两个地址收 POST）
    密钥只从项目根目录 .env 读取，不发给前端、不写日志。 */
 const http = require('http'), fs = require('fs'), path = require('path');
 const { WebSocketServer } = require('ws');
@@ -22,6 +23,7 @@ const { createYahoo } = require('./yahoo');
 const { createEvents, parseFeeds, TOPIC, LANGS } = require('./events');
 const crypto = require('crypto');
 const { createCirra, KIND } = require('./cirra');
+const { createAiLog, parseBias, cleanMeta } = require('./ailog');
 const { createAnnouncer, announceConfig } = require('./announce');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -142,7 +144,9 @@ function json(res, code, body) {
    每天最多 AI_DAILY 次（默认 20，按本机日期；没真正问到模型的不算），同一份提问 15 分钟内直接回上次的结果 */
 const AI_DAILY = Math.max(1, parseInt(E.AI_DAILY, 10) || 20), aiCache = new Map();
 let aiDay = '', aiUsed = 0;
-async function aiAnalyze(prompt) {
+/* 留痕：成功的分析记到 var/ai/log.jsonl（AI_LOG_DIR 可改位置），页面按之后的K线打分 */
+const aiLog = createAiLog(E.AI_LOG_DIR || path.join(ROOT, 'var', 'ai'));
+async function aiAnalyze(prompt, meta) {
   const key = crypto.createHash('sha256').update(prompt).digest('hex'), hit = aiCache.get(key), t = Date.now();
   if (hit && t - hit.at < 15 * 60e3) return { ...hit.r, at: hit.at, cached: true };
   const today = new Date(t).toDateString();
@@ -154,6 +158,10 @@ async function aiAnalyze(prompt) {
   if (!r.ok && (r.status == null || [400, 401, 403, 404, 429].includes(r.status))) aiUsed--;
   if (r.ok) {
     aiCache.set(key, { at: Date.now(), r });
+    if (meta) {
+      try { aiLog.append({ id: key.slice(0, 12) + '-' + Date.now().toString(36), at: Date.now(), ...meta, bias: parseBias(r.text), summary: r.summary, writer: r.writer, text: r.text }); }
+      catch (e) { console.warn('[ai] 记不下来：' + e.message); }
+    }
     if (aiCache.size > 20) aiCache.delete(aiCache.keys().next().value);
   } else console.warn(`[ai] ${r.reason}`);
   return { ...r, at: Date.now(), cached: false };
@@ -205,13 +213,15 @@ const server = http.createServer(async (req, res) => {
     try { b = JSON.parse(raw); } catch { return json(res, 400, { error: '不是合法的 JSON' }); }
     if (u.pathname === '/api/ai/analyze') {
       if (!b || typeof b.prompt != 'string' || !b.prompt.trim() || [...b.prompt].length > 40000) return json(res, 400, { error: '须有 prompt（最多 4 万字）' });
-      return json(res, 200, await aiAnalyze(b.prompt));
+      return json(res, 200, await aiAnalyze(b.prompt, cleanMeta(b.meta, TFS)));
     }
     if (!b || typeof b.text != 'string' || !b.text.trim() || !Object.hasOwn(KIND, b.kind)) return json(res, 400, { error: `须有 text，kind 须为 ${Object.keys(KIND).join('/')}` });
     const r = await cirra.send({ text: b.text, emotion: KIND[b.kind], kind: b.kind });
     if (!r.ok && r.reason !== 'Cirra 没开') console.warn(`[cirra] ${r.reason}`);
     return json(res, 200, r);
   }
+  /* AI 分析的记录（最近 200 条，可按 sym、tf 筛） */
+  if (u.pathname === '/api/ai/log') return json(res, 200, aiLog.list({ sym: u.searchParams.get('sym') || '', tf: u.searchParams.get('tf') || '' }));
   if (u.pathname === '/api/sources') return json(res, 200, { etoro: { ok: KEYS }, yahoo: { ok: true }, history: { ok: true, sets: histSets() } });
   if (u.pathname === '/api/fx') {
     const ccy = u.searchParams.get('ccy') || '';

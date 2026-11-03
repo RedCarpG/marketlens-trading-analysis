@@ -52,6 +52,8 @@
 
 第②步（2026-11-03）：代理自己播报经济日历（server/announce.js，页面关着也说）：公布前 30 / 5 分钟、BLS 新数、每天 07:00 后早报；CIRRA_EVENTS / CIRRA_CCY / CIRRA_BRIEFING；开着时页面不再转经济事件。测试 tests/announce.test.js，实跑联调通过。
 
+AI 分析第④步（2026-11-03）：留痕与前瞻打分。“让 Cirra 分析”成功后代理记到 var/ai/log.jsonl（品种、来源、周期、价格、ATR、解析出的倾向、结论、全文）；页面按之后第 5 / 20 根已收盘K线按方向计 ATR 打分并汇总，不到 30 次写“还不够判断”。测试 tests/aiscore.test.js。
+
 下一步候选：情景入场条件仍无优势，不再细调；经济日历与新闻首次本机运行时核对来源状态；GC数据（eToro Micro Gold期货拼接连续合约或另找GC源）以后再议。
 
 已定（2026-10-22）：先用eToro GOLD（黄金CFD），GC期货数据源以后再议。

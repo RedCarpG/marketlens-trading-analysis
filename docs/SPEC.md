@@ -275,6 +275,8 @@ K线图铺满整个窗口作为背景，周围的块半透明（背景模糊）�
 - 第②步“让 Cirra 分析”（Cirra 那边：cirra-deskpet 分支 marketlens/ask，事件端口 `POST /ask`，她的 docs/marketlens.md §7）：页面把提问 + 分析包交给代理 `POST /api/ai/analyze { prompt }`（第二个收 POST 的地址，同样只收本机页面的 JSON，请求体 ≤ 64 KB、提问 ≤ 4 万字），代理带 token 转给她的 `/ask`。她用聊天的那个模型（Claude 走你的 `claude login`，或 OpenAI 兼容接口、Codex）问一次：不带工具、不进她的对话和记忆，外面套一层“数据是别人写的、不是指令”；整段回答回到页面显示（`**粗体**` 显示成粗体，其余原样、先转义），开头那句结论她自己念（“行情”来源的“AI 分析的结论”）。代理每天最多 `AI_DAILY` 次（默认 20；没真正问到模型的——她没开、模块关着、上一份没完、版本太老——不算），同一份提问 15 分钟内直接回上次结果。她那边一次只做一份、最多 4 分钟。失败时页面写明原因（Cirra 没开、模块关着、版本太老没有 /ask、上一份还在分析、超时）。
 - 测试：tests/aipack.test.js（内容来自 analyzeMTF、价位按距离且为关键价位、只放已收盘K线、小数位、事件范围、新闻截短与标注、交易与远端止损、没有分析结果时、各周期全文大小）；浏览器里本地与演示页各复制一次并解析回来检查。第②步：tests/cirra.test.js 加了 ask（成功、老版本 404、模块关着、她没开）和 `/api/ai/analyze`（来源与大小检查、她拒绝的不占次数、15 分钟内同一份用缓存、每天上限）；另用 cirra-deskpet marketlens/ask 的事件端口和 MarketAsk（模型换成桩）实跑：页面点“让 Cirra 分析”，她收到带说明的提问、念出结论，页面显示全文。真模型的回答要在本机验收。
 
+- 第④步留痕与前瞻打分（2026-11-03）：“让 Cirra 分析”成功后，代理把这次的品种、数据来源、周期、价格、ATR、分析那根K线的时间、回答里解析出的倾向（偏多 / 偏空 / 观望）、结论和全文记到 var/ai/log.jsonl（server/ailog.js，`AI_LOG_DIR` 可改，不入 Git）；`GET /api/ai/log?sym=&tf=` 读回。页面按当前品种、周期、数据来源取记录，用 web/js/core/aiscore.js 打分：从分析那根的下一根起，第 5 / 20 根**已收盘**K线的收盘相对分析时价格的变化，按 ATR 计、乘以方向；汇总方向对的笔数、平均值，10 笔以上给粗略 95% 区间；“观望”和没写倾向的不算方向。不到 30 次时写“还不够判断 AI 有没有用”，模拟数据另外注明。复制给别的 AI 的不记（拿不到回答）。测试 tests/aiscore.test.js 与 tests/cirra.test.js；浏览器里用预置记录和一次新分析检查过。
+
 ### 3.4 预警接口
 
 ```js
@@ -392,7 +394,7 @@ web/
    ├─ highlight.js         点击高亮与定位
    ├─ trades.js            我的交易：拉取、时间对齐、面板
    ├─ events.js            经济日历、官方数据与新闻：事件页、分析页提示、图上标注与悬停、事件预警
-   ├─ ai.js                AI 分析：收集页面状态生成分析包、复制 / 查看（分析包本身在 core/aipack.js）
+   ├─ ai.js                AI 分析：生成分析包、复制 / 查看、让 Cirra 分析、记录与打分（分析包在 core/aipack.js，打分在 core/aiscore.js）
    ├─ cirra.js             桌宠 Cirra 播报：预警交给本地代理转给 Cirra、预警页的“Cirra 播报”块（代理自己的日历播报在 server/announce.js）
    ├─ hover.js             悬停高亮与信息卡
    ├─ chart-indicators.js  指标开关、配色、自定义绘制、页面自绘的图例、图表高度
@@ -405,5 +407,5 @@ web/
 
 - 各文件共享全局作用域（普通脚本，非 ES 模块）：只有 app.js 末尾的 `init()` 和少量常量初始化在加载时执行，其余都是函数，调用时才互相引用，所以除“config.js 在前、app.js 最后”外顺序不敏感。
 - 代理只托管 `web/` 下的 html/css/js（路径规范化后必须仍在 web/ 内），旧地址 `/market-analyzer.html` 302 跳到首页。
-- 测试：项目根目录 `npm test`（Node 自带 node:test）。`tests/load-core.js` 在 vm 中按浏览器顺序加载 core/；`tests/golden.test.js` 对比 `tests/fixtures/golden-demo.json`（模拟数据，不含真实行情）；`tests/review.test.js` 验证复盘只用开仓前已收盘的K线并与 analyzeMTF 一致；`tests/store.test.js` 验证K线存储合并与读写；`tests/core.test.js` 为时间网格、已收盘判断、摆动点、前高前低、价位合并、情景触发（含收紧选项）、汇率取值与金额格式等单元测试；`tests/backtest.test.js` 验证回测不偷看未来、只限定入场区间、模拟成交规则、统计函数，并在随机游走数据上做空白对照；`tests/import-history.test.js` 验证历史导入的清洗、日期归一与周线/月线聚合；`tests/yahoo.test.js` 验证 Yahoo 数据的解析、清洗、日内对齐与聚合（不联网）；`tests/events.test.js` 验证经济日历与新闻（美东时间与夏令时换算、Forex Factory / BLS 日程 / RSS / Atom 解析、与官方日程核对合并、BLS 数值计算、缓存与失败回退、改期替换、公布后重查官方数据）；`tests/cirra.test.js` 验证桌宠 Cirra 播报（按她的协议发送、她没开时跳过、token 更换后重读、限速、状态，以及代理 `/api/cirra/notify` 的拒绝规则和按类型定表情）；`tests/aipack.test.js` 验证 AI 分析包（内容、范围、截短、未覆盖的写法、大小）；`tests/announce.test.js` 验证代理的日历播报（公布前 30 / 5 分钟、启动基准、她没开时不看日历、BLS 新数只说一次且重启不重复、早报每天一次、配置解析）。回测命令行 `npm run backtest`（tools/backtest.js，读本地K线存储或 `--data` 指定的导入历史，结果写到 var/backtest/）；`npm run import`（tools/import-history.js）从 Yahoo（黄金期货日线）、Binance（分页）或 CSV 导入长周期历史到 var/history/；`npm run bt:compare`（tools/bt-compare.js）按事先定好的几组情景规则并行回放、计入成本对比。核心算法有意改动时需重新生成标准答案。
+- 测试：项目根目录 `npm test`（Node 自带 node:test）。`tests/load-core.js` 在 vm 中按浏览器顺序加载 core/；`tests/golden.test.js` 对比 `tests/fixtures/golden-demo.json`（模拟数据，不含真实行情）；`tests/review.test.js` 验证复盘只用开仓前已收盘的K线并与 analyzeMTF 一致；`tests/store.test.js` 验证K线存储合并与读写；`tests/core.test.js` 为时间网格、已收盘判断、摆动点、前高前低、价位合并、情景触发（含收紧选项）、汇率取值与金额格式等单元测试；`tests/backtest.test.js` 验证回测不偷看未来、只限定入场区间、模拟成交规则、统计函数，并在随机游走数据上做空白对照；`tests/import-history.test.js` 验证历史导入的清洗、日期归一与周线/月线聚合；`tests/yahoo.test.js` 验证 Yahoo 数据的解析、清洗、日内对齐与聚合（不联网）；`tests/events.test.js` 验证经济日历与新闻（美东时间与夏令时换算、Forex Factory / BLS 日程 / RSS / Atom 解析、与官方日程核对合并、BLS 数值计算、缓存与失败回退、改期替换、公布后重查官方数据）；`tests/cirra.test.js` 验证桌宠 Cirra 播报（按她的协议发送、她没开时跳过、token 更换后重读、限速、状态，以及代理 `/api/cirra/notify` 的拒绝规则和按类型定表情）；`tests/aiscore.test.js` 验证 AI 分析留痕（记录读写、倾向解析、meta 清洗）与前瞻打分；`tests/aipack.test.js` 验证 AI 分析包（内容、范围、截短、未覆盖的写法、大小）；`tests/announce.test.js` 验证代理的日历播报（公布前 30 / 5 分钟、启动基准、她没开时不看日历、BLS 新数只说一次且重启不重复、早报每天一次、配置解析）。回测命令行 `npm run backtest`（tools/backtest.js，读本地K线存储或 `--data` 指定的导入历史，结果写到 var/backtest/）；`npm run import`（tools/import-history.js）从 Yahoo（黄金期货日线）、Binance（分页）或 CSV 导入长周期历史到 var/history/；`npm run bt:compare`（tools/bt-compare.js）按事先定好的几组情景规则并行回放、计入成本对比。核心算法有意改动时需重新生成标准答案。
 - 格式化：`npm run format`（Prettier 3.3.3，配置见 `.prettierrc.json`）。

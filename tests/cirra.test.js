@@ -227,6 +227,7 @@ test('代理 /api/cirra/notify：只收本机页面的 JSON；表情按 kind 定
     EVENTS_DIR: path.join(d, 'ev'),
     CIRRA_EVENTS: '0',
     AI_DAILY: '2',
+    AI_LOG_DIR: path.join(d, 'ai'),
   });
   const O = `http://127.0.0.1:${port}`,
     J = { 'content-type': 'application/json' },
@@ -275,8 +276,26 @@ test('代理 /api/cirra/notify：只收本机页面的 JSON；表情按 kind 定
     const n = asked();
     assert.equal((await ai('A')).json.cached, true);
     assert.equal(asked(), n);
-    assert.equal((await ai('B')).json.ok, true);
+    /* 带 meta 的成功分析记下来（AI_LOG_DIR），倾向从回答里解析；不带 meta 的（上面几次）不记 */
+    assert.deepEqual((await req(port, 'GET', '/api/ai/log')).json, []);
+    c.srv.ask = () => ({
+      status: 200,
+      body: { text: '1. 一句话总结：回踩支撑\n2. 倾向：偏多。', summary: '回踩支撑', writer: 'Claude' },
+    });
+    const meta = { sym: 'GOLD', src: 'etoro', tf: '1h', price: 4010.5, atr: 12, barTime: 1 };
+    const b1 = await req(port, 'POST', '/api/ai/analyze', {
+      headers: { ...J, origin: O },
+      body: JSON.stringify({ prompt: 'B', meta }),
+    });
+    assert.equal(b1.json.ok, true);
+    const logged = (await req(port, 'GET', '/api/ai/log?sym=GOLD&tf=1h')).json;
+    assert.deepEqual(
+      logged.map(r => [r.sym, r.src, r.tf, r.price, r.atr, r.bias, r.summary, r.writer]),
+      [['GOLD', 'etoro', '1h', 4010.5, 12, '偏多', '回踩支撑', 'Claude']]
+    );
+    assert.deepEqual((await req(port, 'GET', '/api/ai/log?sym=BTCUSDT')).json, []);
     assert.match((await ai('C')).json.reason, /今天已经分析了 2 次/);
+
     assert.equal(asked(), n + 1);
     /* 她关了：仍回 200，ok 为假 */
     fs.rmSync(file);

@@ -4,9 +4,19 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const CORE = ['time', 'indicators', 'levels', 'mtf', 'scenarios', 'review', 'money', 'demo', 'backtest', 'aipack'].map(
-  f => path.join(__dirname, '..', 'web', 'js', 'core', f + '.js')
-);
+const CORE = [
+  'time',
+  'indicators',
+  'levels',
+  'mtf',
+  'scenarios',
+  'review',
+  'money',
+  'demo',
+  'backtest',
+  'aipack',
+  'aiscore',
+].map(f => path.join(__dirname, '..', 'web', 'js', 'core', f + '.js'));
 
 function loadCore(now) {
   const ctx = vm.createContext({ console, Math, JSON });

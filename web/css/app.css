@@ -2027,6 +2027,18 @@ details[open]::details-content {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+/* AI 分析的记录与打分 */
+.ais {
+  margin: 8px 0;
+  padding: 8px 10px;
+  border-radius: var(--rs);
+  background: var(--bg);
+}
+.ail {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--bd);
+}
 .aino {
   color: #d9822b;
 }

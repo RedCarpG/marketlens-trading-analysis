@@ -188,6 +188,7 @@ function show() {
   refresh();
   mktPill();
   fitChart();
+  loadAiLog();
   if (live) start();
 }
 /* 顶栏里的最新价：价格、本周期涨跌（相对上一根K线收盘）、数据来源；实时更新时价格短暂闪一下涨跌色。

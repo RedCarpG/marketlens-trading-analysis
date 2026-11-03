@@ -25,7 +25,8 @@
 | `GET /api/events/news?topic=&lang=` | 新闻，`topic` 为 gold / btc / macro，`lang` 为 zh / en |
 | `GET /api/cirra/status` | 桌宠 Cirra 开没开，见下文“桌宠 Cirra 播报” |
 | `POST /api/cirra/notify` | 让 Cirra 说一句 `{ text, kind }` |
-| `POST /api/ai/analyze` | 请 Cirra 的 AI 分析一次 `{ prompt }`，回整段回答（只有这两个地址收 POST） |
+| `POST /api/ai/analyze` | 请 Cirra 的 AI 分析一次 `{ prompt, meta }`，回整段回答（只有这两个地址收 POST）；成功的带 meta 记到 `var/ai/log.jsonl` |
+| `GET /api/ai/log?sym=&tf=` | AI 分析的记录（最近 200 条），页面按之后的K线打分 |
 | `GET /api/store` | 本地K线存储概况：每个品种/周期已存根数与起止时间 |
 | `GET /api/health` | 是否已配置行情密钥（keys）、交易密钥（trade）、实时报价口径 |
 
