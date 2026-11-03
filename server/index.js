@@ -11,7 +11,8 @@
    GET /api/events/calendar                             → 经济日历（Forex Factory + BLS / 美联储官方日程）与 BLS 最新官方数据
    GET /api/events/news?topic=&lang=                    → 新闻（RSS，按主题和语言）
    GET /api/cirra/status                                → 桌宠 Cirra 开没开（见 cirra.js）
-   POST /api/cirra/notify  { text, kind }               → 让 Cirra 把一条预警说出来（唯一收 POST 的地址）
+   POST /api/cirra/notify  { text, kind }               → 让 Cirra 把一条预警说出来
+   POST /api/ai/analyze    { prompt }                   → 请 Cirra 的 AI 分析一次（提问 + 分析包），回整段回答（只有这两个地址收 POST）
    密钥只从项目根目录 .env 读取，不发给前端、不写日志。 */
 const http = require('http'), fs = require('fs'), path = require('path');
 const { WebSocketServer } = require('ws');
@@ -19,6 +20,7 @@ const { TFS, createClient, createTrader, advance, pickPrice, Upstream } = requir
 const { createStore } = require('./store');
 const { createYahoo } = require('./yahoo');
 const { createEvents, parseFeeds, TOPIC, LANGS } = require('./events');
+const crypto = require('crypto');
 const { createCirra, KIND } = require('./cirra');
 const { createAnnouncer, announceConfig } = require('./announce');
 
@@ -109,7 +111,7 @@ const cirra = createCirra(E.CIRRA_ENDPOINT_FILE ? { file: E.CIRRA_ENDPOINT_FILE 
 const ANN = announceConfig(E);
 const announcer = ANN.on && createAnnouncer({
   calendar: () => events.calendar(),
-  cirra: { present: cirra.present, send: ({ text, kind }) => cirra.send({ text, emotion: KIND[kind] }) },
+  cirra: { present: cirra.present, send: ({ text, kind }) => cirra.send({ text, emotion: KIND[kind], kind }) },
   ccy: ANN.ccy,
   briefing: ANN.briefing,
   file: path.join(ROOT, 'var', 'cirra.json'),
@@ -136,6 +138,28 @@ function json(res, code, body) {
   res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
   res.end(JSON.stringify(body));
 }
+/* AI 分析（docs/AI.md）：页面把提问 + 分析包交过来，转给 Cirra 的 /ask（用她聊天的那个模型、你的登录）。
+   每天最多 AI_DAILY 次（默认 20，按本机日期；没真正问到模型的不算），同一份提问 15 分钟内直接回上次的结果 */
+const AI_DAILY = Math.max(1, parseInt(E.AI_DAILY, 10) || 20), aiCache = new Map();
+let aiDay = '', aiUsed = 0;
+async function aiAnalyze(prompt) {
+  const key = crypto.createHash('sha256').update(prompt).digest('hex'), hit = aiCache.get(key), t = Date.now();
+  if (hit && t - hit.at < 15 * 60e3) return { ...hit.r, at: hit.at, cached: true };
+  const today = new Date(t).toDateString();
+  if (aiDay !== today) { aiDay = today; aiUsed = 0; }
+  if (aiUsed >= AI_DAILY) return { ok: false, reason: `今天已经分析了 ${AI_DAILY} 次（.env 的 AI_DAILY 可改）` };
+  aiUsed++;
+  const r = await cirra.ask(prompt);
+  /* 没问到模型的（她没开、模块关着、上一份没完、版本太老）不占次数 */
+  if (!r.ok && (r.status == null || [400, 401, 403, 404, 429].includes(r.status))) aiUsed--;
+  if (r.ok) {
+    aiCache.set(key, { at: Date.now(), r });
+    if (aiCache.size > 20) aiCache.delete(aiCache.keys().next().value);
+  } else console.warn(`[ai] ${r.reason}`);
+  return { ...r, at: Date.now(), cached: false };
+}
+/* 收 POST 的地址和请求体上限 */
+const POSTS = { '/api/cirra/notify': 4096, '/api/ai/analyze': 65536 };
 /* 读请求体：超过 max 字节返回 null（多出来的读掉丢弃，好正常回 413） */
 function readBody(req, max) {
   return new Promise(resolve => {
@@ -161,26 +185,30 @@ function params(u) {
 
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://local');
-  /* 只有“让 Cirra 说一句”收 POST；其余只读 */
-  const isPost = req.method === 'POST' && u.pathname === '/api/cirra/notify';
+  /* 只有 POSTS 里的地址收 POST；其余只读 */
+  const isPost = req.method === 'POST' && Object.hasOwn(POSTS, u.pathname);
   if (req.method !== 'GET' && !isPost) return json(res, 405, { error: '只支持 GET' });
   /* 旧地址（拆分前的单文件页面）跳到首页 */
   if (u.pathname === '/market-analyzer.html') { res.writeHead(302, { location: '/' }); return res.end(); }
   if (!u.pathname.startsWith('/api/') && serveWeb(u, res)) return;
   if (u.pathname.startsWith('/api/') && (!HOSTS.has(req.headers.host) || (req.headers.origin && !ORIGINS.has(req.headers.origin)))) return json(res, 403, { error: 'forbidden' });
   if (u.pathname === '/api/health') return json(res, 200, { ok: true, keys: KEYS, trade: TKEYS, price: PRICE, events: true });
-  /* 桌宠 Cirra。POST 必须带本机页面的 Origin、Content-Type 为 JSON（外站网页发不了：不回 CORS 头，预检过不去）、请求体 ≤ 4 KB；
-     kind 只认预设的几种，表情按 kind 定，不收页面传来的表情。她没开时也回 200（ok: false），页面只显示状态 */
+  /* 桌宠 Cirra 与 AI 分析。POST 必须带本机页面的 Origin、Content-Type 为 JSON（外站网页发不了：不回 CORS 头，预检过不去）、请求体不超过 POSTS 的上限；
+     预警的 kind 只认预设的几种，表情按 kind 定，不收页面传来的表情。她没开时也回 200（ok: false），页面只显示状态 */
   if (u.pathname === '/api/cirra/status') return json(res, 200, { ...(await cirra.status()), file: cirra.file, announce: ANN.on ? { ccy: ANN.ccy, briefing: ANN.briefing } : null });
   if (isPost) {
     if (!req.headers.origin || !ORIGINS.has(req.headers.origin)) return json(res, 403, { error: 'forbidden' });
     if (!/^application\/json\b/i.test(req.headers['content-type'] || '')) return json(res, 415, { error: '只收 application/json' });
-    const raw = await readBody(req, 4096);
+    const raw = await readBody(req, POSTS[u.pathname]);
     if (raw == null) return json(res, 413, { error: '请求体太大' });
     let b;
     try { b = JSON.parse(raw); } catch { return json(res, 400, { error: '不是合法的 JSON' }); }
+    if (u.pathname === '/api/ai/analyze') {
+      if (!b || typeof b.prompt != 'string' || !b.prompt.trim() || [...b.prompt].length > 40000) return json(res, 400, { error: '须有 prompt（最多 4 万字）' });
+      return json(res, 200, await aiAnalyze(b.prompt));
+    }
     if (!b || typeof b.text != 'string' || !b.text.trim() || !Object.hasOwn(KIND, b.kind)) return json(res, 400, { error: `须有 text，kind 须为 ${Object.keys(KIND).join('/')}` });
-    const r = await cirra.send({ text: b.text, emotion: KIND[b.kind] });
+    const r = await cirra.send({ text: b.text, emotion: KIND[b.kind], kind: b.kind });
     if (!r.ok && r.reason !== 'Cirra 没开') console.warn(`[cirra] ${r.reason}`);
     return json(res, 200, r);
   }
@@ -284,7 +312,7 @@ server.listen(PORT, HOST, () => {
   console.log(`MarketLens 已启动：http://${HOST}:${PORT}/`);
   if (!KEYS) console.warn('未配置 ETORO_API_KEY / ETORO_USER_KEY：页面可用（模拟、CSV、Binance、Yahoo、本地历史），eToro 数据服务不可用');
   if (!TKEYS) console.warn('未配置 ETORO_TRADE_API_KEY / ETORO_TRADE_USER_KEY：不显示个人交易记录');
-  console.log(ANN.on ? `桌宠 Cirra 日历播报：开（${ANN.ccy.join('/')}，早报 ${ANN.briefing || '关'}；Cirra 没开时不说）` : '桌宠 Cirra 日历播报：关（CIRRA_EVENTS=0）');
+  console.log(ANN.on ? `桌宠 Cirra 日历播报：开（${ANN.ccy.join('/')}，早报 ${ANN.briefing || '关'}；Cirra 没开时不说）` : '桌宠 Cirra 日历播报：关（新版 Cirra 自己看日历；老版本才需要 .env 的 CIRRA_EVENTS=1）');
   const st = store.list();
   console.log(`本地K线存储：${st.length ? st.map(s => `${s.instrumentId}/${s.interval} ${s.count}根`).join('，') : '暂无（打开页面后开始积累）'}`);
 });

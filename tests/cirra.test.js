@@ -25,6 +25,13 @@ function fakeCirra(token) {
       req.on('data', c => (s += c));
       req.on('end', () => {
         const b = JSON.parse(s);
+        /* /ask：给了 srv.ask 才有（新版 Cirra，docs/marketlens.md §7） */
+        if (req.url === '/ask') {
+          if (!srv.ask) return end(404, '没有这个地址');
+          got.push({ ask: b });
+          const r = srv.ask(b);
+          return res.writeHead(r.status, { 'content-type': 'application/json' }).end(JSON.stringify(r.body));
+        }
         if (req.url !== '/notify') return end(404, '没有这个地址');
         if (typeof b.text != 'string' || !b.text.trim()) return end(400, '缺少 text');
         if (b.emotion !== undefined && !EMO.includes(b.emotion)) return end(400, 'emotion 不对');
@@ -48,7 +55,11 @@ test('send：按她的协议发到 /notify（Host、token、JSON、表情），�
     assert.deepEqual(await ci.send({ text: '黄金 GOLD 离你的止损\n3990.00 只差 0.4 个 ATR', emotion: 'worried' }), {
       ok: true,
     });
-    assert.deepEqual(c.got[0].body, { text: '黄金 GOLD 离你的止损 3990.00 只差 0.4 个 ATR', emotion: 'worried' });
+    assert.deepEqual(c.got[0].body, {
+      text: '黄金 GOLD 离你的止损 3990.00 只差 0.4 个 ATR',
+      emotion: 'worried',
+      source: 'market',
+    });
     assert.equal(c.got[0].headers.host, `127.0.0.1:${c.port}`);
     assert.equal(c.got[0].body.title, undefined); // 不传 title：她的来源名已经是“外部通知 / 行情”
     await ci.send({ text: 'x'.repeat(300), emotion: 'angry' }); // 她不认得的表情改成 neutral
@@ -116,6 +127,28 @@ test('send：每分钟最多 8 条，过一分钟恢复；她没开时不占名�
     t += 60e3;
     assert.equal((await ci.send({ text: '一分钟后' })).ok, true);
     assert.equal(c.got.length, 9);
+  } finally {
+    c.srv.close();
+    fs.rmSync(d, { recursive: true, force: true });
+  }
+});
+
+test('ask：请她分析一次，整段回答回来；老版本（没有 /ask）、模块关着、她没开都给出原因', async () => {
+  const d = tmp(),
+    file = path.join(d, 'endpoint.json'),
+    c = await fakeCirra('t');
+  try {
+    const ci = createCirra({ file });
+    assert.deepEqual(await ci.ask('分析包'), { ok: false, reason: 'Cirra 没开' });
+    writeEp(file, c.port, 't');
+    const old = await ci.ask('分析包');
+    assert.deepEqual([old.ok, old.status], [false, 404]);
+    assert.match(old.reason, /还不能做 AI 分析/);
+    c.srv.ask = () => ({ status: 403, body: { error: 'Cirra 设置里「MarketLens 行情」关着' } });
+    assert.deepEqual(await ci.ask('分析包'), { ok: false, status: 403, reason: 'Cirra 设置里「MarketLens 行情」关着' });
+    c.srv.ask = () => ({ status: 200, body: { text: '偏多。\n……', summary: '偏多。', writer: 'DeepSeek' } });
+    assert.deepEqual(await ci.ask('分析包'), { ok: true, text: '偏多。\n……', summary: '偏多。', writer: 'DeepSeek' });
+    assert.deepEqual(c.got.at(-1), { ask: { prompt: '分析包' } });
   } finally {
     c.srv.close();
     fs.rmSync(d, { recursive: true, force: true });
@@ -193,6 +226,7 @@ test('代理 /api/cirra/notify：只收本机页面的 JSON；表情按 kind 定
     CIRRA_ENDPOINT_FILE: file,
     EVENTS_DIR: path.join(d, 'ev'),
     CIRRA_EVENTS: '0',
+    AI_DAILY: '2',
   });
   const O = `http://127.0.0.1:${port}`,
     J = { 'content-type': 'application/json' },
@@ -212,9 +246,38 @@ test('代理 /api/cirra/notify：只收本机页面的 JSON；表情按 kind 定
       JSON.stringify({ text: '离你的止损只差 0.4 个 ATR', kind: 'dn', emotion: 'happy' })
     );
     assert.deepEqual([ok.status, ok.json], [200, { ok: true }]);
-    assert.deepEqual(c.got[0].body, { text: '离你的止损只差 0.4 个 ATR', emotion: 'worried' });
+    assert.deepEqual(c.got[0].body, {
+      text: '离你的止损只差 0.4 个 ATR',
+      emotion: 'worried',
+      source: 'market',
+      kind: 'dn',
+    });
     assert.deepEqual((await req(port, 'GET', '/api/cirra/status')).json, { running: true, file, announce: null });
     assert.equal((await req(port, 'POST', '/api/candles', { headers: { ...J, origin: O }, body: '{}' })).status, 405);
+    /* AI 分析：转给她的 /ask；她拒绝（模块关着）的不占次数；同一份 15 分钟内用上次的；每天上限 AI_DAILY=2 */
+    const ai = (prompt, headers = { ...J, origin: O }) =>
+        req(port, 'POST', '/api/ai/analyze', { headers, body: JSON.stringify({ prompt }) }),
+      asked = () => c.got.filter(g => g.ask).length;
+    assert.equal((await ai('A', J)).status, 403);
+    assert.equal((await ai('')).status, 400);
+    c.srv.ask = () => ({ status: 403, body: { error: 'Cirra 设置里「MarketLens 行情」关着' } });
+    assert.equal((await ai('A')).json.reason, 'Cirra 设置里「MarketLens 行情」关着');
+    c.srv.ask = () => ({
+      status: 200,
+      body: { text: '1. 偏多，非农前别追。\n2. ……', summary: '偏多，非农前别追。', writer: 'Claude' },
+    });
+    const a1 = (await ai('A')).json;
+    assert.deepEqual(
+      [a1.ok, a1.text, a1.summary, a1.writer, a1.cached],
+      [true, '1. 偏多，非农前别追。\n2. ……', '偏多，非农前别追。', 'Claude', false]
+    );
+    assert.deepEqual(c.got.filter(g => g.ask).at(-1).ask, { prompt: 'A' });
+    const n = asked();
+    assert.equal((await ai('A')).json.cached, true);
+    assert.equal(asked(), n);
+    assert.equal((await ai('B')).json.ok, true);
+    assert.match((await ai('C')).json.reason, /今天已经分析了 2 次/);
+    assert.equal(asked(), n + 1);
     /* 她关了：仍回 200，ok 为假 */
     fs.rmSync(file);
     const off = await post({ ...J, origin: O }, '{"text":"在吗","kind":"test"}');

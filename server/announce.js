@@ -117,9 +117,11 @@ function createAnnouncer({ calendar, cirra, ccy = ['USD'], briefing = '07:00', f
   return { tick, state: st };
 }
 
-/* .env：CIRRA_EVENTS（默认开，0 关）、CIRRA_CCY（默认 USD，可写 USD,EUR）、CIRRA_BRIEFING（HH:MM，默认 07:00，留空不播早报） */
+/* .env：CIRRA_EVENTS（默认关，1 开）、CIRRA_CCY（默认 USD，可写 USD,EUR）、CIRRA_BRIEFING（HH:MM，默认 07:00，留空不播早报）。
+   默认关（2026-11-03）：新版 Cirra 自己看 MarketLens 的日历（她的「MarketLens 行情」模块，知道你在不在电脑前），两边都播会说两遍；
+   只给没有这个模块的老版本 Cirra 用 */
 function announceConfig(E) {
-  const on = E.CIRRA_EVENTS == null || !/^(0|false|off|no)$/i.test(String(E.CIRRA_EVENTS).trim()),
+  const on = /^(1|true|on|yes)$/i.test(String(E.CIRRA_EVENTS == null ? '' : E.CIRRA_EVENTS).trim()),
     ccy = String(E.CIRRA_CCY || 'USD').toUpperCase().split(/[,\s]+/).filter(c => /^[A-Z]{3}$/.test(c)),
     b = E.CIRRA_BRIEFING == null ? '07:00' : String(E.CIRRA_BRIEFING).trim(),
     m = b.match(/^(\d{1,2}):(\d{2})$/),

@@ -259,6 +259,7 @@ function initPanel() {
     if (q('#trv')) return openReview();
     if (q('#btgo')) return openBacktest();
     if (q('#evr')) return loadEvents(), loadNews(1);
+    if (q('#aia')) return aiAsk();
     if (q('#aic')) return aiCopy();
     if (q('#aiv')) return aiView();
     if ((x = q('[data-evo]'))) return setEvOpt(x.dataset.evo, x.dataset.v);

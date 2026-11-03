@@ -167,11 +167,13 @@ test('briefingText：日历没取到照实说；都公布了；不说“没有�
   for (const t of [L(5, 7, 0), L(6, 7, 0), L(6, 21, 0)]) assert.doesNotMatch(briefingText(r, t, ['USD']), /风险/);
 });
 
-test('announceConfig：默认开、USD、07:00；可关、多个货币、留空不播早报、时间写错当作不播', () => {
-  assert.deepEqual(announceConfig({}), { on: true, ccy: ['USD'], briefing: '07:00' });
+test('announceConfig：默认关（新版 Cirra 自己看日历）、USD、07:00；1 开、多个货币、留空不播早报、时间写错当作不播', () => {
+  assert.deepEqual(announceConfig({}), { on: false, ccy: ['USD'], briefing: '07:00' });
   assert.equal(announceConfig({ CIRRA_EVENTS: '0' }).on, false);
-  assert.equal(announceConfig({ CIRRA_EVENTS: 'off' }).on, false);
-  assert.deepEqual(announceConfig({ CIRRA_CCY: 'usd, eur', CIRRA_BRIEFING: '7:30' }), {
+  assert.equal(announceConfig({ CIRRA_EVENTS: '' }).on, false);
+  assert.equal(announceConfig({ CIRRA_EVENTS: '1' }).on, true);
+  assert.equal(announceConfig({ CIRRA_EVENTS: 'on' }).on, true);
+  assert.deepEqual(announceConfig({ CIRRA_EVENTS: '1', CIRRA_CCY: 'usd, eur', CIRRA_BRIEFING: '7:30' }), {
     on: true,
     ccy: ['USD', 'EUR'],
     briefing: '07:30',
