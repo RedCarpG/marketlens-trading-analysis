@@ -149,6 +149,7 @@ ${
 <div class="lbl" style="margin-top:10px">多周期结论</div><div class="chain">${ch}</div>
 ${evRisk()}
 </section>
+${aiBlock()}
 ${m.why.length ? blk('why', `评分说明 <span class="n">${m.why.length}</span>`, `<ul class="why">${m.why.map(w => `<li>${w}</li>`).join('')}</ul>`) : ''}
 ${blk('sc', `价格行为情景 <span class="mu">${tf} · 纯K线</span>`, scn, chip('pl', '图上') + '<button class="chip" id="btgo" title="用当前品种的历史K线回测情景、信号和评分（B）">回测</button>')}
 ${blk('lv', `关键价位 <span class="mu">${tf} 及更大</span>`, keys, chip('hl', '前高前低') + chip('sr', '支撑阻力'))}
@@ -258,6 +259,8 @@ function initPanel() {
     if (q('#trv')) return openReview();
     if (q('#btgo')) return openBacktest();
     if (q('#evr')) return loadEvents(), loadNews(1);
+    if (q('#aic')) return aiCopy();
+    if (q('#aiv')) return aiView();
     if ((x = q('[data-evo]'))) return setEvOpt(x.dataset.evo, x.dataset.v);
     if ((x = q('.evr[data-ev]'))) return hlEvent(EV && EV.events && EV.events.find(e => e.id == x.dataset.ev));
     if ((x = q('.sg[data-n]'))) return lastM && hlSig(lastM.t.a.sigs[+x.dataset.n]);

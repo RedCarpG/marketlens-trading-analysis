@@ -1,6 +1,6 @@
 # MarketLens
 
-个人行情观察与分析工具：K线铺满整页，自上而下多周期分析（1M / 1w → 1d → 4h → 1h / 15m）、关键价位与前高前低、价格行为情景、价格预警、交易复盘、规则回测，以及经济日历（非农、CPI、FOMC 等）、BLS 官方数据与新闻；预警可交给桌宠 Cirra 说出来（[docs/CIRRA.md](docs/CIRRA.md)）。只读行情，不下单。
+个人行情观察与分析工具：K线铺满整页，自上而下多周期分析（1M / 1w → 1d → 4h → 1h / 15m）、关键价位与前高前低、价格行为情景、价格预警、交易复盘、规则回测，以及经济日历（非农、CPI、FOMC 等）、BLS 官方数据与新闻；预警可交给桌宠 Cirra 说出来（[docs/CIRRA.md](docs/CIRRA.md)）；当前分析可整理成分析包复制给 AI（[docs/AI.md](docs/AI.md)）。只读行情，不下单。
 
 **在线演示：** https://redcarpg.github.io/marketlens-trading-analysis/
 演示页使用模拟K线、模拟交易记录和公开的加密货币行情；规则的初步回测未发现可靠优势（见 docs/BACKTEST.md），不构成投资建议。
