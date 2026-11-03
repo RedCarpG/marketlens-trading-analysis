@@ -1,6 +1,6 @@
 # AI 分析（计划，未实现）
 
-日期：2026-11-03。状态：用户确认按推荐来——默认交给 Cirra，暂不做 MarketLens 直接调 API；第①步“分析包 + 复制”、第②步“让 Cirra 分析”（MarketLens 这边 + cirra-deskpet 分支 feature/market-ask 的 `POST /ask`）已完成，见 SPEC 3.3.12；第③步（直接调 API）暂不做。
+日期：2026-11-03。状态：用户确认按推荐来——默认交给 Cirra，暂不做 MarketLens 直接调 API；第①步“分析包 + 复制”、第②步“让 Cirra 分析”（MarketLens 这边 + cirra-deskpet 分支 marketlens/ask 的 `POST /ask`）已完成，见 SPEC 3.3.12；第③步（直接调 API）暂不做。
 
 用户的问题：能不能接入 AI 分析——MarketLens 自己有 AI 接口，或者 Cirra 开着时交给她的 AI；之前回测效果差，是不是因为没结合时事、K线和各种指标、计划不合理；用 AI 多角度分析会不会更好。
 
