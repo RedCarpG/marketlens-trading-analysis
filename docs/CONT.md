@@ -68,7 +68,9 @@ AI 分析第④步（2026-11-03）：留痕与前瞻打分。“让 Cirra 分析
 
 核心库第一段（2026-11-26，路线图第 1 步）：新增 core/（marketlens-core 0.1.0）。源码还是 web/js/core/ 那一份；core/load.js 是不用构建的加载器（从 tests/load-core.js 搬过来，代理和命令行工具改用它，server/ 不再引用 tests/），core/build.js 拼成 dist/index.mjs 和 index.cjs，npm run pack:core 打成 tgz。新加 web/js/core/summary.js：analyzeCandles（从K线直接得到分析）和 describeState（四句只有事实的话 + 结构化的 facts，不带评分、结论、情景）。测试 tests/summary.test.js、tests/corepkg.test.js（包和源码逐字段一致），共 76 项通过；用真实 GOLD K线和一个空项目试过打出来的包。tgz 只在本机，还没发 Release，也还没提交。设计见 SPEC 第 11 节、core/README.md。同日删掉了远端旧分支 ccr-bd0a1e8b-mxsb48（内容已全在 main）。
 
-下一步：路线图第 2 步，在 cirra-plugins 里把插件升到 1.1（装 marketlens-core，加问位置的工具、早上那句带位置、事迹）。见 docs/ROADMAP.md §5。情景入场条件仍无优势，不再细调；GC数据（eToro Micro Gold期货拼接连续合约或另找GC源）以后再议。
+Cirra 插件 1.1.0（2026-11-26，路线图第 2 步，在 X:\Project\Cirra\cirra-plugins 的分支 feature/marketlens-core，工作区 X:\Project\Cirra\wt-marketlens-core）：装 marketlens-core，新工具 market_levels、早上多一句位置（通知种类「早上的行情位置」）、事迹（BLS 新数据、日线大波动）、每日小结「行情提醒」；不写品种时先 eToro GOLD、没配密钥用 Yahoo GC=F。插件测试 39 项、类型检查通过，编好的插件连本机代理试过。还没做完的：本仓库的提交还没推送，Release 没发（这个会话里推送被权限检查拦下），所以插件的依赖暂时指着本机的 tgz，分支没有合进 DEV。
+
+下一步：推送 → 发 Release → 插件依赖换成 Release 地址 → 合进 cirra-plugins 的 DEV；然后是路线图第 3 步（复盘与纪律）。见 docs/ROADMAP.md §5。情景入场条件仍无优势，不再细调；GC数据（eToro Micro Gold期货拼接连续合约或另找GC源）以后再议。
 
 已定（2026-10-22）：先用eToro GOLD（黄金CFD），GC期货数据源以后再议。
 待定：Binance适配器是否需要验证；v0.3中未写入项目说明的内容（手动ChatGPT分析包、SQLite留痕）是否还要。（经济日历与新闻的真实联调已于 2026-11-26 通过；DATA_VALIDATION.md 已归档。）GitHub：当前仓库 https://github.com/RedCarpG/marketlens-trading-analysis（公开；2026-10-24 由 web-trading-MarketLens-app 改名；命名：全小写连字符，品牌名 + 用途；main），.env、server/node_modules、work/ 均未上传。
