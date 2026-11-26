@@ -2635,3 +2635,209 @@ button:active,
     display: none;
   }
 }
+
+/* ===== 交易日记、我的守则、开仓体检（journal.js）：对话框沿用复盘面板的样子，窄一些 ===== */
+#jnm {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 40px 16px;
+  overflow: auto;
+  background: rgb(0 0 0 / 0.32);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.22s var(--ease),
+    visibility 0s linear 0.22s;
+}
+#jnm.open {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+#jnm.open .rvp {
+  transform: none;
+}
+.jnp {
+  max-width: 560px;
+}
+.jnp .lbl {
+  margin: 14px 0 6px;
+}
+.jnp .jno {
+  margin: 10px 0 4px;
+}
+.jnp a {
+  color: var(--ac);
+  cursor: pointer;
+}
+.jnt,
+.jni,
+.jnn {
+  font: inherit;
+  color: var(--tx);
+  background: var(--pn2);
+  border: 1px solid var(--bd);
+  border-radius: var(--rs);
+}
+.jnt {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  line-height: 1.6;
+  resize: vertical;
+}
+.jni {
+  flex: 1;
+  min-width: 140px;
+  padding: 4px 8px;
+}
+.jnn {
+  width: 58px;
+  margin: 0 4px;
+  padding: 2px 4px;
+  text-align: center;
+}
+.jnt:focus,
+.jni:focus,
+.jnn:focus {
+  outline: none;
+  border-color: var(--ac);
+}
+.jnf {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+.jtags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.jtag {
+  padding: 2px 9px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--mu);
+  background: var(--pn2);
+  border: 1px solid var(--bd);
+  border-radius: 999px;
+}
+button.jtag.on {
+  color: var(--ac);
+  border-color: var(--ac);
+  background: var(--acs);
+}
+.jtag.m {
+  font-style: italic;
+}
+.jmood {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+/* 逐条结果 */
+.ckb {
+  display: grid;
+  gap: 4px;
+}
+.cki {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.cki > span {
+  width: 14px;
+  flex: none;
+  text-align: center;
+  font-weight: 700;
+}
+.cki small {
+  display: block;
+  color: var(--mu);
+}
+.cki.bad > span {
+  color: var(--dn);
+}
+.cki.good > span {
+  color: var(--up);
+}
+.cki.na > span {
+  color: var(--mu);
+}
+/* 交易页：持仓下面的体检一行、右下角的日记按钮和标签 */
+.ckl {
+  margin-top: 3px;
+  line-height: 1.5;
+}
+.ckl.bad {
+  color: var(--dn);
+}
+.ckl.good {
+  color: var(--up);
+}
+.jnr {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+  margin-top: 3px;
+}
+.jnb {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  font-size: 12px;
+  color: var(--mu);
+  border-color: transparent;
+  border-radius: 50%;
+  opacity: 0.55;
+}
+.sg:hover .jnb,
+.jnb.on {
+  opacity: 1;
+}
+.jnb.on {
+  color: var(--ac);
+}
+/* 复盘面板里的守则统计 */
+.rvr {
+  margin: 12px 0;
+}
+.rvr table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.rvr th,
+.rvr td {
+  padding: 3px 8px;
+  text-align: right;
+  border-bottom: 1px solid var(--bd);
+}
+.rvr td:first-child,
+.rvr th:first-child {
+  text-align: left;
+}
+.rvr th[colspan] {
+  text-align: center;
+}
+/* 复盘面板：最近几周那张表里“最该记住的”一列靠左、可以换行 */
+.rvr td.rvl,
+.rvw th:last-child {
+  text-align: left;
+  white-space: normal;
+}
+.rvr td:last-child {
+  white-space: normal;
+}

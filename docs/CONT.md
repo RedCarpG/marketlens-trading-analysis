@@ -72,7 +72,11 @@ Cirra 插件 1.1.0（2026-11-26，路线图第 2 步，在 X:\Project\Cirra\cirr
 
 第 2 步收尾（2026-11-26，同一天晚些时候）：main 已推送；发了 Release `core-v0.1.0`（挂 marketlens-core-0.1.0.tgz，下载下来的哈希和本机的、和插件 lockfile 里的一致）；插件的依赖换成 Release 地址，合进了 cirra-plugins 的本地 DEV（7bff8d5，合并后的提交上插件测试 39 项、类型检查通过，dist 里已是 1.1.0），临时工作区和功能分支删了。cirra-plugins 没有推送（归它的管理会话）。
 
-下一步：用户在 Cirra 里重新加载并打开插件、验收；然后是路线图第 3 步（复盘与纪律）。见 docs/ROADMAP.md §5。情景入场条件仍无优势，不再细调；GC数据（eToro Micro Gold期货拼接连续合约或另找GC源）以后再议。
+守则、开仓体检、交易日记（2026-11-26，路线图第 3 步的 A1、A2、A4）：新增 web/js/core/rules.js（七条可勾选的守则 + 自己写的文字、逐条体检、新开仓时说的话、复盘统计）、web/js/journal.js（交易页的守则对话框、每笔持仓的体检一行、每笔交易的日记、每分钟看一次持仓并在新开仓时弹一条）、server/journal.js 和 /api/journal（存在本机 var/journal.json）；core/review.js 加了走到过哪（最深浮亏 / 最高浮盈）、星期、时段；复盘面板加守则表、两张分组表、三列明细；预警页和 Cirra 播报各多一项“开仓体检”（给 Cirra 的默认关，类型 ck / cko）。守则默认一条都不勾。测试 tests/rules.test.js、tests/journal.test.js，共 91 项通过；浏览器里用模拟品种走了一遍，测试时写的 var/journal.json 已删。路线图 §6 剩下的两件事用户定了按推荐。详见 SPEC 3.3.13。
+
+第 3 步后半（2026-11-26，A3、A5）：core/review.js 加 whatIf（同一批真实入场换三种出场，用回测的 btSim，按 R 比实际），core/rules.js 加 weekly（最近几周一周一行，带“这一周最该记住的”）；复盘面板多两张表。测试 tests/whatif.test.js，共 96 项通过；浏览器里用模拟品种看过。第 3 步的改动都还没提交。
+
+下一步：用户在 Cirra 里重新加载并打开插件、验收；在交易页定自己的守则，用真实交易看复盘面板；然后是路线图第 4 步（插件自己取数）。见 docs/ROADMAP.md §5。情景入场条件仍无优势，不再细调；GC数据（eToro Micro Gold期货拼接连续合约或另找GC源）以后再议。
 
 已定（2026-10-22）：先用eToro GOLD（黄金CFD），GC期货数据源以后再议。
 待定：Binance适配器是否需要验证；v0.3中未写入项目说明的内容（手动ChatGPT分析包、SQLite留痕）是否还要。（经济日历与新闻的真实联调已于 2026-11-26 通过；DATA_VALIDATION.md 已归档。）GitHub：当前仓库 https://github.com/RedCarpG/marketlens-trading-analysis（公开；2026-10-24 由 web-trading-MarketLens-app 改名；命名：全小写连字符，品牌名 + 用途；main），.env、server/node_modules、work/ 均未上传。

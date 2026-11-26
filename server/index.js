@@ -25,6 +25,7 @@ const crypto = require('crypto');
 const { createCirra, KIND } = require('./cirra');
 const { createWatch, parseWatch } = require('./watch');
 const { createAiLog, parseBias, cleanMeta } = require('./ailog');
+const { createJournal } = require('./journal');
 
 const ROOT = path.resolve(__dirname, '..');
 function loadEnv(f) {
@@ -167,8 +168,10 @@ async function aiAnalyze(prompt, meta) {
   } else console.warn(`[ai] ${r.reason}`);
   return { ...r, at: Date.now(), cached: false };
 }
+/* 交易日记与我的守则：只存在本机 var/journal.json（JOURNAL_FILE 可改位置），见 journal.js */
+const journal = createJournal(E.JOURNAL_FILE || path.join(ROOT, 'var', 'journal.json'));
 /* 收 POST 的地址和请求体上限 */
-const POSTS = { '/api/cirra/notify': 4096, '/api/ai/analyze': 65536 };
+const POSTS = { '/api/cirra/notify': 4096, '/api/ai/analyze': 65536, '/api/journal': 16384 };
 /* 读请求体：超过 max 字节返回 null（多出来的读掉丢弃，好正常回 413） */
 function readBody(req, max) {
   return new Promise(resolve => {
@@ -217,11 +220,24 @@ const server = http.createServer(async (req, res) => {
       if (!b || typeof b.prompt != 'string' || !b.prompt.trim() || [...b.prompt].length > 40000) return json(res, 400, { error: '须有 prompt（最多 4 万字）' });
       return json(res, 200, await aiAnalyze(b.prompt, cleanMeta(b.meta, TFS)));
     }
+    /* 日记与守则：{ rules } 换整份守则，或 { key: "品种|交易号", note } 写一条日记（note 为空是删掉） */
+    if (u.pathname === '/api/journal') {
+      try {
+        if (b && b.rules && typeof b.rules == 'object') return json(res, 200, { ok: true, rules: journal.setRules(b.rules) });
+        const note = b ? journal.setNote(b.key, b.note) : undefined;
+        if (note === undefined) return json(res, 400, { error: '须有 rules，或 key（品种|交易号）和 note' });
+        return json(res, 200, { ok: true, note });
+      } catch (e) {
+        console.warn(`[journal] ${e.message}`);
+        return json(res, 500, { error: e.message });
+      }
+    }
     if (!b || typeof b.text != 'string' || !b.text.trim() || !Object.hasOwn(KIND, b.kind)) return json(res, 400, { error: `须有 text，kind 须为 ${Object.keys(KIND).join('/')}` });
     const r = await cirra.send({ text: b.text, emotion: KIND[b.kind], kind: b.kind });
     if (!r.ok && r.reason !== 'Cirra 没开') console.warn(`[cirra] ${r.reason}`);
     return json(res, 200, r);
   }
+  if (u.pathname === '/api/journal') return json(res, 200, journal.get());
   /* AI 分析的记录（最近 200 条，可按 sym、tf 筛） */
   if (u.pathname === '/api/ai/log') return json(res, 200, aiLog.list({ sym: u.searchParams.get('sym') || '', tf: u.searchParams.get('tf') || '' }));
   if (u.pathname === '/api/sources') return json(res, 200, { etoro: { ok: KEYS }, yahoo: { ok: true }, history: { ok: true, sets: histSets() } });

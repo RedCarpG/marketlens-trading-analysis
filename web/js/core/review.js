@@ -44,6 +44,18 @@ function reviewTrade(t, all) {
     stop = slAtr == null ? 'none' : slAtr < 0.5 ? 'tight' : slAtr > 3 ? 'wide' : 'ok';
   const sc = m.sc.flatMap(c => c.trigs).find(g => g.state == '已触发' && g.dir === dir);
   const closed = t.closeRate != null && t.closeTs != null;
+  /* 持仓期间走到过哪：最深浮亏（mae）和最高浮盈（mfe），按开仓时的 ATR 计。用入场周期的K线，从开仓所在那根到平仓所在那根
+     （持仓中的到最新一根）；开仓那根含开仓前的一段，所以略偏大 */
+  let lo = Infinity,
+    hi = -Infinity;
+  for (const k of all[T] || [])
+    if (nxt(T, k.timestamp) > t.openTs && k.timestamp <= (closed ? t.closeTs : Infinity)) {
+      lo = Math.min(lo, k.low);
+      hi = Math.max(hi, k.high);
+    }
+  const path = hi > -Infinity,
+    od = new Date(t.openTs),
+    uh = od.getUTCHours();
   return {
     t,
     dir,
@@ -64,8 +76,15 @@ function reviewTrade(t, all) {
     r: closed && slAtr != null ? ((t.closeRate - p) * dir) / Math.abs(t.sl - p) : null,
     holdH: closed ? (t.closeTs - t.openTs) / 36e5 : null,
     win: closed && t.netProfit != null ? t.netProfit > 0 : null,
+    mae: path ? Math.max(0, dir > 0 ? p - lo : hi - p) / x : null,
+    mfe: path ? Math.max(0, dir > 0 ? hi - p : p - lo) / x : null,
+    /* 开仓在星期几、哪个时段（按 UTC：亚洲 0–7 点、欧洲 7–13 点、美国 13–21 点、其余算收盘后） */
+    dow: od.getUTCDay(),
+    sess: uh < 7 ? 'asia' : uh < 13 ? 'eu' : uh < 21 ? 'us' : 'late',
   };
 }
+const RV_DOW = { 1: '周一', 2: '周二', 3: '周三', 4: '周四', 5: '周五', 6: '周六', 0: '周日' };
+const RV_SESS = { asia: '亚洲时段', eu: '欧洲时段', us: '美国时段', late: '美国收盘后' };
 
 /* 汇总：只统计已平仓且复盘成功的交易；按顺逆势、入场位置、止损、是否有同向情景分组，并给出几条最值得注意的结论 */
 /* cs：洞察文字里金额前的币种符号（可省略） */
@@ -85,14 +104,18 @@ function summarizeReviews(rvs, cs = '') {
     pos: grp(r => r.pos, RV_POS),
     stop: grp(r => r.stop, RV_STOP),
     sc: grp(r => (r.sc ? 'y' : 'n'), { y: '有同向情景已触发', n: '无同向情景' }),
+    /* 开仓的星期和时段：只列表，不进下面的“值得注意”（笔数少时容易看出不存在的规律） */
+    dow: grp(r => r.dow, RV_DOW),
+    sess: grp(r => r.sess, RV_SESS),
   };
+  const DIMS = ['align', 'pos', 'stop', 'sc'].map(k => groups[k]);
   const avg = a => (a.length ? a.reduce((s, r) => s + r.holdH, 0) / a.length : null),
     holdWin = avg(ok.filter(r => r.win)),
     holdLoss = avg(ok.filter(r => !r.win));
   /* 结论：每个维度（顺逆势、入场位置、止损、情景）里净亏最多且至少 2 笔的那一组，按净亏从大到小，说明它占全部亏损额的比例；
      再补最赚钱的一组、持仓时长和止损的情况 */
   const insights = [];
-  const worst = Object.values(groups)
+  const worst = DIMS
     .map(gs => gs.filter(g => g.n >= 2 && g.net < 0).sort((a, b) => a.net - b.net)[0])
     .filter(Boolean)
     .sort((a, b) => a.net - b.net);
@@ -101,7 +124,7 @@ function summarizeReviews(rvs, cs = '') {
       insights.push(
         `${w.name}：${w.n} 笔，胜率 ${Math.round((w.win / w.n) * 100)}%，净亏 ${cs}${(-w.net).toFixed(0)}，相当于全部亏损额的 ${Math.round((-w.net / loss) * 100)}%`
       );
-  const best = Object.values(groups)
+  const best = DIMS
     .flat()
     .filter(g => g.n >= 2 && g.net > 0)
     .sort((a, b) => b.net - a.net)[0];
@@ -115,7 +138,62 @@ function summarizeReviews(rvs, cs = '') {
     );
   const noStop = ok.filter(r => r.stop == 'none').length;
   if (noStop) insights.push(`${noStop} 笔没有设置有效止损（未设或只有 eToro 默认的远端止损）`);
-  return { n: ok.length, win: ok.filter(r => r.win).length, net: net(ok), holdWin, holdLoss, groups, insights };
+  /* 走到过哪：亏损单里曾经浮盈 1 个 ATR 以上的（赚过又亏回去）；盈利单平均扛过多深的浮亏 */
+  const losers = ok.filter(r => !r.win && r.mfe != null),
+    gave = losers.filter(r => r.mfe >= 1).length,
+    winners = ok.filter(r => r.win && r.mae != null),
+    mean = (a, f) => (a.length ? a.reduce((s, r) => s + f(r), 0) / a.length : null),
+    path = { lossMfe: mean(losers, r => r.mfe), winMae: mean(winners, r => r.mae), gave, losers: losers.length };
+  if (gave >= 2) insights.push(`${losers.length} 笔亏损单里有 ${gave} 笔曾经浮盈超过 1 个 ATR，后来亏着平的`);
+  return { n: ok.length, win: ok.filter(r => r.win).length, net: net(ok), holdWin, holdLoss, groups, insights, path };
 }
 
 const fmtHold = h => (h == null ? '—' : h < 48 ? h.toFixed(1) + ' 小时' : (h / 24).toFixed(1) + ' 天');
+
+/* ===== 复盘里的“如果”：同一批真实入场，换一种出场会怎样 =====
+   回测里（docs/BACKTEST.md 第 15 节）“让盈利单跑”比固定目标每笔多 0.1–0.5R；这里把同样的出场规则用在你自己的入场上，
+   看对你这批交易是不是也这样。用回测的成交模拟 btSim（backtest.js）：入场周期的K线，从开仓所在那根的下一根起逐根检查。
+   盈亏都按 R（初始风险的倍数）算，不计点差和隔夜费：实际那一笔也按同样的口径（平仓价差 ÷ 初始风险），两边才能比。
+   初始风险 = 你设的止损；没设（或只有远端默认止损）的按 2 个 ATR 当止损算，并计入 assumed。
+   K线不够走完的（还在持有）不算；只统计已平仓、复盘成功的交易。笔数少时只当参考。 */
+const WHATIF = [
+  { id: 'trail2', name: '不设目标，回撤 2 个 ATR 就走（移动止损）', exit: { tgtR: 0, trail: 2 } },
+  { id: 'hold10', name: '不设目标，拿满 10 根K线就走', exit: { tgtR: 0, hold: 10 } },
+  { id: 'r2', name: '赚到 2 倍风险就走', exit: { tgtR: 2 } },
+];
+function whatIf(rvs, all, exits = WHATIF) {
+  const base = [];
+  for (const r of rvs) {
+    if (!r.ok || r.win == null) continue;
+    const t = r.t,
+      B = all[r.tf] || [];
+    let i = -1;
+    for (let j = B.length - 1; j >= 0; j--)
+      if (B[j].timestamp <= t.openTs) {
+        i = j;
+        break;
+      }
+    if (i < 0) continue;
+    const own = r.slAtr != null,
+      stop = own ? t.sl : t.openRate - r.dir * 2 * r.atr,
+      risk = Math.abs(t.openRate - stop);
+    if (!(risk > 0)) continue;
+    base.push({ r, B, tr: { dir: r.dir, entry: t.openRate, stop, tgt: r.dir * Infinity, atr: r.atr, i }, own, actual: ((t.closeRate - t.openRate) * r.dir) / risk });
+  }
+  const mean = a => (a.length ? a.reduce((s, v) => s + v, 0) / a.length : null);
+  return exits.map(e => {
+    const done = base
+      .map(b => ({ b, sim: btSim(b.B, b.tr, { exit: e.exit, maxHold: 1e6, spread: 0, fee: 0 }) }))
+      .filter(x => x.sim.R != null);
+    return {
+      id: e.id,
+      name: e.name,
+      n: done.length,
+      pending: base.length - done.length,
+      assumed: done.filter(x => !x.b.own).length,
+      actual: mean(done.map(x => x.b.actual)),
+      alt: mean(done.map(x => x.sim.R)),
+      better: done.filter(x => x.sim.R > x.b.actual).length,
+    };
+  });
+}

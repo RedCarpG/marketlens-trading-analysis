@@ -178,7 +178,7 @@ function alPanel() {
         .join('') || '<div class="empty">暂无</div>';
   return `<div class="alh"><div><b>价格预警</b><div class="mu sm">${AL.on ? `<span class="lvd"></span>监控中 · ${cur.sym} · ${tf}` : '未开启'}</div></div>
 <button class="swb${AL.on ? ' on' : ''}" data-al-on role="switch" aria-checked="${!!AL.on}" title="${AL.on ? '关闭预警' : '开启预警'}"></button></div>
-<div class="opts">${opt('lv', '到达关键价位', '价格进入关键价位 ±0.15 ATR')}${opt('sc', '情景触发 / 失效', '价格行为情景状态变化')}${opt('sl', '接近我的止损 / 止盈', '距离 0.5 ATR 以内（eToro 持仓）')}${opt('ev', '重要经济事件', `${ccyOf().join(' / ')} 高影响事件公布前 30 / 5 分钟；BLS 公布新的非农、CPI 时（需本地代理）`)}</div>
+<div class="opts">${opt('lv', '到达关键价位', '价格进入关键价位 ±0.15 ATR')}${opt('sc', '情景触发 / 失效', '价格行为情景状态变化')}${opt('sl', '接近我的止损 / 止盈', '距离 0.5 ATR 以内（eToro 持仓）')}${opt('ck', '开仓体检', '新开一笔时对照我的守则，说哪几条没守（eToro 持仓，每分钟看一次；守则在交易页定）')}${opt('ev', '重要经济事件', `${ccyOf().join(' / ')} 高影响事件公布前 30 / 5 分钟；BLS 公布新的非农、CPI 时（需本地代理）`)}</div>
 <div class="note2">价位、情景、止损止盈只监控当前品种和周期，需保持页面打开；开启后自动连接实时行情。${np}。</div>
 ${ciPanel()}
 ${blk('all', `最近预警 <span class="n">${Math.min(10, alLog.length)}</span>`, lg)}`;
@@ -257,6 +257,13 @@ function initPanel() {
     if (q('#trr')) return loadTrades();
     if ((x = q('[data-trccy]'))) return x.disabled || setTrCcy(x.dataset.trccy);
     if (q('#trv')) return openReview();
+    /* 守则、日记、体检（journal.js）：先于下面“点一行在图上定位” */
+    if (q('#trg') || q('[data-jn-rules]')) return jnOpen('rules');
+    if ((x = q('[data-jn]') || q('.ckl'))) {
+      const row = x.closest('.sg'),
+        t = row && TR && (row.dataset.tro != null ? TR.open[+row.dataset.tro] : TR.closed[+row.dataset.trc]);
+      return t && jnOpen('note', t);
+    }
     if (q('#btgo')) return openBacktest();
     if (q('#evr')) return loadEvents(), loadNews(1);
     if (q('#aia')) return aiAsk();

@@ -14,6 +14,7 @@ const FILES = [
   'scenarios',
   'alertrules',
   'review',
+  'rules',
   'money',
   'demo',
   'backtest',

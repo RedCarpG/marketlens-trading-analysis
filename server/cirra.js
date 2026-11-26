@@ -15,8 +15,9 @@ const path = require('path');
 const FILE = path.join(os.homedir(), '.cirra', 'endpoint.json');
 /* 她认得的表情（cirra-deskpet sidecar/src/core/protocol.ts 的 EMOTIONS），别的值她回 400 */
 const EMOTIONS = ['neutral', 'happy', 'sad', 'surprised', 'sleepy', 'worried'];
-/* 预警类型 → 她的表情（页面不传表情，由这里决定）。scx = 情景失效 / 到目标 / 被取代；test = “试一下” */
-const KIND = { lv: 'neutral', sc: 'surprised', scx: 'neutral', dn: 'worried', up: 'happy', ev: 'surprised', test: 'happy' };
+/* 预警类型 → 她的表情（页面不传表情，由这里决定）。scx = 情景失效 / 到目标 / 被取代；test = “试一下”；
+   ck / cko = 开仓体检：有守则没守 / 都守住了（句子里只有守则的名字，没有金额） */
+const KIND = { lv: 'neutral', sc: 'surprised', scx: 'neutral', dn: 'worried', up: 'happy', ev: 'surprised', ck: 'worried', cko: 'happy', test: 'happy' };
 /* 她的气泡显示时截到 200 字，这里先截好 */
 const clip = s => [...String(s == null ? '' : s).replace(/\s+/g, ' ').trim()].slice(0, 200).join('');
 

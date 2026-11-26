@@ -89,6 +89,7 @@ async function loadTrades() {
   if (cur.sym !== sym) return;
   TR = t;
   if (bars.length) refresh();
+  checkNewPositions(); // 新开的持仓：对照我的守则说一声（journal.js）
 }
 /* 模拟交易：在 1 小时K线上按品种代码做种子生成（同一品种每次一样），约 14 笔已平仓 + 1 笔持仓。
    每笔随机方向、持仓 3–36 根、杠杆 5–20 倍、名义金额约 2000 美元 × 杠杆；多数设止损（1.2–2.5 ATR）、部分设止盈（2–3 ATR），
@@ -186,7 +187,7 @@ function trPanel() {
           : fx.err
             ? `<div class="mnote sm">取不到${CCY[trCcy][0]}汇率：${fx.err}（按美元显示）</div>`
             : '',
-    tools = `<div class="tbar">${chip('tr', '图上显示')}<span class="sp"></span><button class="chip" id="trv" title="逐笔复盘：开仓时的大周期、入场位置、止损、情景">复盘</button><button class="chip" id="trr" title="重新拉取交易记录">${TRL ? '<i class="spin"></i>' : ''}刷新</button></div>
+    tools = `<div class="tbar">${chip('tr', '图上显示')}<span class="sp"></span><button class="chip" id="trg" title="我的守则：自己定几条规矩，开仓时逐条对照">守则</button><button class="chip" id="trv" title="逐笔复盘：开仓时的大周期、入场位置、止损、情景、守则">复盘</button><button class="chip" id="trr" title="重新拉取交易记录">${TRL ? '<i class="spin"></i>' : ''}刷新</button></div>
 <div class="tbar trcy"><span class="mu sm">金额币种</span>${ccySeg}</div>${fxNote}`;
   /* 模拟交易标明来源，免得误认为真实账户 */
   const demo =
@@ -204,7 +205,7 @@ function trPanel() {
         .map(
           (p, i) =>
             `<div class="sg${on('o|' + p.id)}" data-key="o|${p.id}" data-tro="${i}" title="点击在图上定位，再点取消"><div class="r1">${side(p)}<span>${+p.units.toFixed(4)} @${f(p.openRate)}</span>${p.pnl != null ? `<b class="r" style="color:${dc(p.pnl)}">${money(p.pnl)}</b>` : ''}</div>
-<div class="mu sm">${fmt('1h', p.openTs)}${p.sl > 0 ? ` · 止损 ${f(p.sl)}` : ''}${p.tp > 0 ? ` · 止盈 ${f(p.tp)}` : ''}</div></div>`
+<div class="mu sm">${fmt('1h', p.openTs)}${p.sl > 0 ? ` · 止损 ${f(p.sl)}` : ''}${p.tp > 0 ? ` · 止盈 ${f(p.tp)}` : ''}</div>${chkLine(p)}${jnMark(p)}</div>`
         )
         .join('') || '<div class="empty">当前没有该品种持仓</div>',
     cl =
@@ -214,12 +215,13 @@ function trPanel() {
         .map(
           t =>
             `<div class="sg${on('c|' + t.id)}" data-key="c|${t.id}" data-trc="${c.indexOf(t)}" title="点击在图上定位，再点取消"><div class="r1">${side(t)}<span>${f(t.openRate)} → ${f(t.closeRate)}</span><b class="r" style="color:${dc(t.netProfit)}">${money(t.netProfit, t.closeTs)}</b></div>
-<div class="mu sm">${fmt('1h', t.openTs)} – ${fmt('1h', t.closeTs)} · ${+t.units.toFixed(4)} 单位 · ${t.leverage}x</div></div>`
+<div class="mu sm">${fmt('1h', t.openTs)} – ${fmt('1h', t.closeTs)} · ${+t.units.toFixed(4)} 单位 · ${t.leverage}x</div>${jnMark(t)}</div>`
         )
         .join('') || '<div class="empty">近一年没有该品种的已平仓交易</div>';
   return (
     tools +
     demo +
+    (JN.err ? `<div class="mnote sm">${esc(JN.err)}</div>` : '') +
     `<div class="stats"><div class="stat"><span>近一年已平仓</span><b>${c.length} 笔</b></div><div class="stat"><span>胜率</span><b>${c.length ? Math.round((w / c.length) * 100) + '%' : '—'}</b></div>
 <div class="stat"><span>净盈亏（${CCY[netC][0]}）</span><b style="color:${dc(net)}">${fmtMoney(net, netC)}</b></div><div class="stat"><span>平均持仓</span><b>${fmtHold(hold)}</b></div></div>` +
     blk('tro', `当前持仓 <span class="n">${TR.open.length}</span>`, op) +

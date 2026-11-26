@@ -21,7 +21,8 @@ Alerts.register((s, c) => console.log('[signal]', c.symbol, c.tf, s.t));
    只监控当前品种和周期，需页面保持打开；开启时自动连接实时行情。每次刷新（实时推送约每 300ms 一次）检查一遍。
    去重：每个提醒有“布防”状态——第一次见到时若已在触发范围内则不提醒（作为基准），触发后要离开足够远才重新布防；
    切换品种/周期时清空状态重新建立基准，避免一打开就被历史状态刷屏 */
-let AL = { on: 0, lv: 1, sc: 1, sl: 1, ev: 1, ...LS.get('alerts', {}) },
+/* ck：开仓体检（新开一笔时对照我的守则，见 journal.js 的 checkNewPositions） */
+let AL = { on: 0, lv: 1, sc: 1, sl: 1, ev: 1, ck: 1, ...LS.get('alerts', {}) },
   alLog = [],
   alArm = {},
   alSc = null,
