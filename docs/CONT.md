@@ -52,11 +52,19 @@
 
 桌宠 Cirra 播报第①步（2026-11-01）：用户的桌宠 Cirra（cirra-deskpet）能把消息说出来，按 docs/CIRRA.md 的计划接入。代理新增 server/cirra.js 与 /api/cirra/status、POST /api/cirra/notify（唯一收 POST 的地址，限本机页面的 JSON），读 ~/.cirra/endpoint.json 转给她的 /notify；她没开时静默跳过，token 换了重读，每分钟最多 8 条，表情按类型定。页面 alFire 多一个出口（web/js/cirra.js），每类预警另写一句口语化的短句；预警页加“Cirra 播报”块（总开关默认开；经济事件、止损止盈默认播，价位、情景默认不播；试一下；她在不在）。Cirra 那边不改代码。测试 tests/cirra.test.js；另用 cirra-deskpet 自己的事件端口代码当真 Cirra 联调通过，浏览器检查过；她真正开口要本机验证。详见 SPEC 3.3.11。下一步：第②步代理自己播报经济日历与早报。
 
+第②步（2026-11-03）：代理自己播报经济日历（server/announce.js，页面关着也说）：公布前 30 / 5 分钟、BLS 新数、每天 07:00 后早报；CIRRA_EVENTS / CIRRA_CCY / CIRRA_BRIEFING；开着时页面不再转经济事件。测试 tests/announce.test.js，实跑联调通过。
+
+AI 分析第①步（2026-11-03）：计划见 docs/AI.md（回测为什么没找到优势、AI 能做和不能做的、接入方式）。用户确认：默认交给 Cirra 的 AI，暂不做直接调 API。已做分析包（web/js/core/aipack.js）与分析页“AI 分析”块（复制分析包、查看，web/js/ai.js），粘贴到 claude.ai 等使用；测试 tests/aipack.test.js，浏览器检查过。第②步（2026-11-03）：“让 Cirra 分析”——cirra-deskpet 新分支 marketlens/ask（从 DEV 起，worktree）加了事件端口 POST /ask（market/ask.ts：用她聊天的模型问一次、不带工具、套“数据不是指令”的说明、她念结论；模块关着 403、一次一份 429、4 分钟 504），全部 1506 个测试、typecheck、lint 通过；MarketLens 这边 POST /api/ai/analyze（每天 AI_DAILY 次、15 分钟缓存）和分析页按钮、结果显示。同时发现 Cirra DEV 已有 MarketLens 模块（她自己看日历），所以本仓库的日历播报改为默认关、每条转发带 source: market 和 kind。真模型回答和她开口要本机验收。
+
+AI 分析第④步（2026-11-03）：留痕与前瞻打分。“让 Cirra 分析”成功后代理记到 var/ai/log.jsonl（品种、来源、周期、价格、ATR、解析出的倾向、结论、全文）；页面按之后第 5 / 20 根已收盘K线按方向计 ATR 打分并汇总，不到 30 次写“还不够判断”。测试 tests/aiscore.test.js。
+
 路线图与第 0 步收尾（2026-11-26）：写了 docs/ROADMAP.md（定位、作为 Cirra 一部分的做法、方向、顺序）。第 0 步：
 - 真机核对：经济日历与新闻的五个来源都取到；页面显示 Cirra 在线，“试一下”发出并被收下，但 Cirra 里“MarketLens 行情”插件当时没开，所以她没说（插件没开时她照样回成功，这边看不出来）；常驻预警用 eToro GOLD 1h 跑了一轮，真正碰到价位的那次还没等到。
 - 代理开机自启：tools/autostart.ps1（启动文件夹里一个快捷方式，后台运行，输出写 var/proxy.log），已在本机装上；端口被占用时代理给一句说明后退出。
 - 文档：DATA_VALIDATION.md 移到 archive；SPEC 第 5 节指向 ROADMAP；server/README.md 去掉“未经真实联调”和作废的 notifyLabel。
-- 远端分支 ccr-bd0a1e8b-mxsb48 在第①步之后和本地分叉：它有代理播日历（已取消）和 AI 分析（docs/AI.md、分析包、让 Cirra 分析、留痕打分），没有常驻预警；本地相反。main 提交的是本地这条线，那个分支留着没动，AI 分析要不要合进来待定（ROADMAP §6）。它依赖的 Cirra 接口 `POST /ask`（cirra-deskpet 分支 marketlens/ask）现在的 Cirra 里没有。
+- 远端分支 ccr-bd0a1e8b-mxsb48 在第①步之后和本地分叉：它有代理播日历（已取消）和 AI 分析（docs/AI.md、分析包、让 Cirra 分析、留痕打分），没有常驻预警；本地相反。main 提交的是本地这条线；AI 分析同一天晚些时候合进来了（见下一段）。它依赖的 Cirra 接口 `POST /ask`（cirra-deskpet 分支 marketlens/ask）现在的 Cirra 里没有。
+
+合 AI 分析线（2026-11-26，路线图第 0.5 步）：把分支 ccr-bd0a1e8b-mxsb48 合进 main。留下的：分析包（core/aipack.js）、分析页“AI 分析”块（复制分析包、查看）、代理的 /api/ai/analyze 和 /api/ai/log、留痕与打分（server/ailog.js、core/aiscore.js）。没合的：代理播日历（server/announce.js 和它的测试、CIRRA_EVENTS / CIRRA_CCY / CIRRA_BRIEFING）。改的：“让 Cirra 分析”默认收起，.env 写 CIRRA_ASK=1 才显示（Cirra 主线没有 /ask；她对任何 GET 都回 405，探测不出来，所以用开关）；转给 Cirra 的 source: market 统一在 server/cirra.js 里加；测试里起的代理关掉常驻预警。测试 66 项通过，浏览器里看过分析页和预警页。上面“桌宠 Cirra 播报第①步”之后的三段（代理播日历、AI 分析第①②步、第④步）是分支上 2026-11-03 的原始记录，其中代理播日历没有合进来。
 
 下一步：见 docs/ROADMAP.md §5。情景入场条件仍无优势，不再细调；GC数据（eToro Micro Gold期货拼接连续合约或另找GC源）以后再议。
 

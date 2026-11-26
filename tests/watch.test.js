@@ -74,7 +74,7 @@ test('Cirra 没开时不取数', async () => {
   assert.deepEqual([calls, said], [[], []]);
 });
 
-test('首轮只建立基准；到价说一次，带 source 和 kind；没离开不重复；大周期只在新K线时重取', async () => {
+test('首轮只建立基准；到价说一次，带 kind（source 由 cirra.js 统一加）；没离开不重复；大周期只在新K线时重取', async () => {
   const clock = { t: T0 },
     p = keyLevel(),
     { w, said, calls, box } = rig({ file: tmp(), clock });
@@ -91,7 +91,6 @@ test('首轮只建立基准；到价说一次，带 source 和 kind；没离开�
   await w.tick();
   const lv = said.filter(b => b.kind == 'lv');
   assert.equal(lv.length, 1);
-  assert.equal(lv[0].source, 'market');
   assert.match(lv[0].text, /^黄金 GOLD 到了/);
   clock.t += POLL;
   await w.tick();

@@ -61,7 +61,7 @@ function createWatch({ list, candles, cirra, file, pollMs = 300e3, get = loadCor
     save();
     for (const h of hits) {
       const s = alText(h, { sym: w.symbol, name: w.name, T: w.tf, px, dp: w.dp });
-      const r = await cirra.send({ text: s.say, emotion: KIND[s.ck], source: 'market', kind: s.ck });
+      const r = await cirra.send({ text: s.say, emotion: KIND[s.ck], kind: s.ck });
       if (!r.ok) warn(`[watch] 没说出去：${r.reason}`);
     }
   }

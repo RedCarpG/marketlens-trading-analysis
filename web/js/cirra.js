@@ -1,9 +1,10 @@
 /* 桌宠 Cirra 播报：预警交给本地代理，由代理转给 Cirra 说出来（代理那边见 server/cirra.js） */
 /* ===== 每次 alFire 发出预警时，按这里的勾选决定要不要交给 Cirra（是弹窗、系统通知之外的又一个出口，所以只在预警总开关开着时才有）。
    CI：本地记住的选项——on 总开关（默认开）；lv 价位、sc 情景（默认关，较频繁）；sl 我的止损 / 止盈、ev 经济事件（默认开）。
-   给她念的是 alFire 的 say（比弹窗文字短、口语化），没有时用弹窗文字。只在经本地代理打开时有（公开演示页没有代理） ===== */
+   给她念的是 alFire 的 say（比弹窗文字短、口语化），没有时用弹窗文字。只在经本地代理打开时有（公开演示页没有代理）。
+   页面转去的“经济事件”，她自己连着日历时由她丢掉，不会说两遍 ===== */
 let CI = { on: 1, lv: 0, sc: 0, sl: 1, ev: 1, ...LS.get('cirra', {}) },
-  /* CS：她在不在（/api/cirra/status）；CL：最近一次交给她的结果 { t, ok, reason } */
+  /* CS：/api/cirra/status——她在不在（running）、代理常驻预警看哪些（watch）、要不要显示“让 Cirra 分析”（ask）；CL：最近一次交给她的结果 { t, ok, reason } */
   CS = null,
   CL = null;
 /* 交给代理的类型（决定她的表情）→ 属于哪个勾选 */
@@ -22,7 +23,7 @@ async function ciPost(text, kind) {
   } catch (_) {
     CL = { t: Date.now(), ok: false, reason: '代理没回话' };
   }
-  if (!CL.ok && /没开/.test(CL.reason)) CS = { running: false, reason: CL.reason };
+  if (!CL.ok && /没开/.test(CL.reason)) CS = { ...CS, running: false, reason: CL.reason };
   else if (CL.ok) CS = { ...CS, running: true };
   ciRedraw();
 }
@@ -43,7 +44,7 @@ async function ciStatus() {
   try {
     CS = await (await fetch('/api/cirra/status')).json();
   } catch (_) {
-    CS = { running: false, reason: '代理没回话' };
+    CS = { ...CS, running: false, reason: '代理没回话' };
   }
   ciRedraw();
 }

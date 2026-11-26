@@ -35,8 +35,10 @@ powershell -File tools\autostart.ps1 install
 | `GET /api/etoro/positions?symbol=` | 我的当前持仓（含浮动盈亏、止损止盈）；给了 symbol 只返回该品种 |
 | `GET /api/events/calendar` | 经济日历与 BLS 最新官方数据，见下文“经济日历与新闻” |
 | `GET /api/events/news?topic=&lang=` | 新闻，`topic` 为 gold / btc / macro，`lang` 为 zh / en |
-| `GET /api/cirra/status` | 桌宠 Cirra 开没开、常驻预警看哪些（`watch`），见下文“桌宠 Cirra 播报” |
-| `POST /api/cirra/notify` | 让 Cirra 说一句 `{ text, kind }`；代理唯一收 POST 的地址 |
+| `GET /api/cirra/status` | 桌宠 Cirra 开没开、常驻预警看哪些（`watch`）、页面要不要显示“让 Cirra 分析”（`ask`），见下文“桌宠 Cirra 播报” |
+| `POST /api/cirra/notify` | 让 Cirra 说一句 `{ text, kind }` |
+| `POST /api/ai/analyze` | 请 Cirra 的 AI 分析一次 `{ prompt, meta }`，回整段回答（只有这两个地址收 POST）；成功的带 meta 记到 `var/ai/log.jsonl` |
+| `GET /api/ai/log?sym=&tf=` | AI 分析的记录（最近 200 条），页面按之后的K线打分 |
 | `GET /api/store` | 本地K线存储概况：每个品种/周期已存根数与起止时间 |
 | `GET /api/health` | 是否已配置行情密钥（keys）、交易密钥（trade）、实时报价口径 |
 
@@ -92,6 +94,7 @@ powershell -File tools\autostart.ps1 install
 - 常驻预警（server/watch.js）：页面关着时也按页面同一套规则看价位和情景，每 5 分钟取一次；她没开时不取数；不读持仓。配置见 `.env.example` 的 `CIRRA_WATCH`，设计见 docs/CIRRA.md §9。
 - `GET /api/cirra/status`：对她的端口发一次 GET，她回 405（只收 POST）即在线；不带 token，不会让她说话。
 - 她那边：要在 Cirra 的设置【扩展】里打开插件“MarketLens 行情”（cirra-plugins 的 `plugins/marketlens`），带 `source: "market"` 的话才有人接；**插件没开时她照样回 204、但不说**，代理和页面看不出区别（页面仍显示“已交给 Cirra”）。插件开着时，推来的话进她的通知模组，来源叫“行情”（免打扰、专注时段、全屏时先攒着，排着几条时合成一句，提醒方式可选说出来 / 只显示 / 只记录 / 关）。
+- AI 分析：`POST /api/ai/analyze { prompt }`（≤ 64 KB、≤ 4 万字，本机页面的 JSON）转给她的 `POST /ask`（她用聊天的那个模型问一次、不带工具，回 `{ text, summary, writer }`，开头那句结论她自己念）。每天最多 `AI_DAILY` 次（默认 20，没问到模型的不算），同一份提问 15 分钟内回上次结果；她没有 `/ask` 时回明白的原因。**这个接口没有进 Cirra 的主线**（只在 cirra-deskpet 的分支 marketlens/ask 上），所以页面上的“让 Cirra 分析”默认收起，`.env` 写 `CIRRA_ASK=1` 才显示（`/api/cirra/status` 的 `ask`）；“复制分析包”不受影响。
 
 ## 本地K线存储
 
