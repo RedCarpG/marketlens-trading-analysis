@@ -80,6 +80,8 @@ Cirra 插件 1.1.0（2026-11-26，路线图第 2 步，在 X:\Project\Cirra\cirr
 
 第 4 步（2026-11-27）：marketlens-core 0.2.0 加取数入口 marketlens-core/data（core/build.js 把 server/yahoo.js、server/events.js 原样复制进包，core/data.d.ts 是类型；createYahoo 的请求函数、createEvents 的提示函数可以换掉）。代理的常驻预警 server/watch.js 改成默认不开（CIRRA_WATCH=gold 再打开）。Cirra 插件 1.2.0（cirra-plugins）：sources.ts（先问代理、连不上自己取）、levelwatch.ts（自己每 5 分钟看黄金 1 小时图的价位）、页面转来的同类不说两遍、设置里两项、联网权限多了几个公开来源。本仓库测试 98 项、插件测试 51 项通过；停掉代理和开着代理各实际跑了一遍编好的插件。
 
+第 4 步收尾（2026-11-27）：main 已推送；发了 Release core-v0.2.0（下载下来的哈希和插件 lockfile 里的一致）；插件依赖换成 Release 地址，合进 cirra-plugins 的本地 DEV（c728f1c，合并后的提交上插件测试 51 项、类型检查通过，dist 里已是 1.2.0），临时工作区和功能分支删了。cirra-plugins 没有推送（归它的管理会话）。注意：代理的常驻预警已经默认不开，Cirra 里的插件更新并打开之前没有人盯价位。
+
 下一步：用户在 Cirra 里更新并打开插件、验收（第 2、4 步）；在交易页定自己的守则，用真实交易看复盘面板（第 3 步）；然后是路线图第 5 步（情境）。见 docs/ROADMAP.md §5。情景入场条件仍无优势，不再细调；GC数据（eToro Micro Gold期货拼接连续合约或另找GC源）以后再议。
 
 已定（2026-10-22）：先用eToro GOLD（黄金CFD），GC期货数据源以后再议。
