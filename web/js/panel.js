@@ -56,6 +56,7 @@ function refresh() {
   const m = analyzeMTF(tf, C, bars.length ? bars[bars.length - 1].close : null);
   drawMarks(m);
   evalAlerts(m);
+  alOutcomes();
   if (m)
     m.t.a.sigs
       .filter(g => g.i === m.t.n - 1)
@@ -209,7 +210,7 @@ function ssBlock() {
     chip('ss', '图上')
   );
 }
-/* 预警页：总开关、几类提醒（可单独勾选）、通知权限状态、我画的线、Cirra 播报、最近 10 条预警 */
+/* 预警页：总开关、几类提醒（可单独勾选）、通知权限状态、我画的线、Cirra 播报、预警记录 */
 function alPanel() {
   const np = !('Notification' in window)
       ? '浏览器不支持系统通知，只在页面内弹出'
@@ -245,21 +246,47 @@ ${
 }
 <div class="note2">按品种记在这个浏览器里，换周期也在。价格走到线的 ±0.15 ATR（按当前周期的 ATR）时提醒一次，离开 0.5 ATR 以后再回来才会再提醒；加线时价格已经在线上的，这一次不提醒。预警关着时线照样画，只是不响。</div>`
           ),
+    /* 预警记录：按类型筛，价位类的补一句之后怎样了 */
+    tys = Object.keys(AL_TY).filter(k => alLog.some(r => r.ty == k)),
+    flt = alF != 'all' && tys.includes(alF) ? alF : 'all',
+    recs = flt == 'all' ? alLog : alLog.filter(r => r.ty == flt),
+    os = outcomeStats(alLog),
+    dt = t =>
+      new Date(t).toLocaleString('zh-CN', {
+        month: 'numeric',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }),
     lg =
-      alLog
-        .slice(0, 10)
-        .map(
-          a =>
-            `<div class="lg k-${a.kind}"><span class="mu">${new Date(a.t).toLocaleTimeString('zh-CN', { hour12: false })}</span>${a.text}</div>`
-        )
-        .join('') || '<div class="empty">暂无</div>';
+      recs
+        .slice(0, alShow)
+        .map(r => {
+          const o = r.o ? { st: r.o, k: r.ok, both: r.ob } : alWait[r.id],
+            ot = r.lp != null ? outcomeText(r, o) : '';
+          return `<div class="lg k-${r.kind}"><span class="mu lgm"><span>${dt(r.t)} · ${esc(r.sym)} ${esc(r.tf)} · ${AL_TY[r.ty]}</span>${r.px != null ? `<span>当时 ${r.px.toFixed(r.dp)}</span>` : ''}</span>${esc(r.text)}${ot ? `<span class="lgo o-${o.st}">${ot}</span>` : ''}</div>`;
+        })
+        .join('') || `<div class="empty">${alLog.length ? '这一类还没有' : '还没有响过'}</div>`,
+    alb =
+      (tys.length > 1
+        ? `<div class="alf"><button class="chip${flt == 'all' ? ' on' : ''}" data-alf="all">全部 ${alLog.length}</button>${tys.map(k => `<button class="chip${flt == k ? ' on' : ''}" data-alf="${k}">${AL_TY[k]} ${alLog.filter(r => r.ty == k).length}</button>`).join('')}</div>`
+        : '') +
+      lg +
+      (recs.length > alShow
+        ? `<button class="chip almore" id="almore">再看 ${Math.min(50, recs.length - alShow)} 条（共 ${recs.length} 条）</button>`
+        : '') +
+      (os.n
+        ? `<div class="note2">价位类 ${os.n} 条（关键价位、我画的线）：之后 10 根K线内先被挡回 1 个 ATR 的 ${os.bounce} 条，先穿过去 1 个 ATR 的 ${os.brk} 条，未定 ${os.open} 条${os.none ? `，还没有结论 ${os.none} 条（还在看，或者那段K线现在没加载、对不上）` : ''}。距离从价位算起，ATR 用响的那一刻的；条数少时看不出规律。</div>`
+        : '') +
+      (alLog.length ? `<div class="note2">记录存在这个浏览器里，最多留 ${AL_MAX} 条，不上传。</div>` : '');
   return `<div class="alh"><div><b>价格预警</b><div class="mu sm">${AL.on ? `<span class="lvd"></span>监控中 · ${cur.sym} · ${tf}` : '未开启'}</div></div>
 <button class="swb${AL.on ? ' on' : ''}" data-al-on role="switch" aria-checked="${!!AL.on}" title="${AL.on ? '关闭预警' : '开启预警'}"></button></div>
 <div class="opts">${opt('lv', '到达关键价位', '价格进入关键价位 ±0.15 ATR')}${opt('ml', '我画的线', '价格进入我画的线 ±0.15 ATR；线在下面加。交给 Cirra 时算在“关键价位”那一项里')}${opt('sc', '情景触发 / 失效', '价格行为情景状态变化')}${opt('sl', '接近我的止损 / 止盈', '距离 0.5 ATR 以内（eToro 持仓）')}${opt('ck', '开仓体检', '新开一笔时对照我的守则，说哪几条没守（eToro 持仓，每分钟看一次；守则在交易页定）')}${opt('ev', '重要经济事件', `${ccyOf().join(' / ')} 高影响事件公布前 30 / 5 分钟；BLS 公布新的非农、CPI 时（需本地代理）`)}</div>
 <div class="note2">价位、情景、止损止盈只监控当前品种和周期，需保持页面打开；开启后自动连接实时行情。${np}。</div>
 ${mls}
 ${ciPanel()}
-${blk('all', `最近预警 <span class="n">${Math.min(10, alLog.length)}</span>`, lg)}`;
+${blk('all', `预警记录 <span class="n">${alLog.length}</span>`, alb, alLog.length ? `<button class="chip" id="alclr" title="清空全部预警记录">${Date.now() - alClr < 4000 ? '再点一次清空' : '清空'}</button>` : '')}`;
 }
 /* 右侧可折叠块：标题右侧放该块对应的图上标注开关；开合状态记在本地，默认展开 */
 let BLK = LS.get('blk', {});
@@ -330,10 +357,23 @@ function initPanel() {
       return setMK(x.dataset.mk);
     }
     if (q('[data-al-on]')) return setAlertsOn(!AL.on);
-    /* 我画的线（alerts.js） */
+    /* 我画的线、预警记录（alerts.js） */
     if (q('#mlb')) return mlAddInput();
     if (q('#mlk')) return mlPickOn(!mlPick);
     if ((x = q('[data-mlx]'))) return mlDel(x.dataset.mlx);
+    if (q('#alclr')) {
+      e.preventDefault();
+      return alClear();
+    }
+    if ((x = q('[data-alf]'))) {
+      alF = x.dataset.alf;
+      alShow = 30;
+      return alRedraw();
+    }
+    if (q('#almore')) {
+      alShow += 50;
+      return alRedraw();
+    }
     if (q('[data-ci-on]')) return setCiOn(!CI.on);
     if (q('#cit')) return ciTest();
     if (q('#trr')) return loadTrades();

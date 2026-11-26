@@ -2979,6 +2979,35 @@ body.mlpick #chart * {
   font-size: 11px;
   white-space: nowrap;
 }
+/* 预警记录：类型筛选、每条下面的“之后怎样了”、再看更多 */
+.alf {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.lg {
+  overflow-wrap: anywhere;
+}
+.lgm {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0 8px;
+}
+.lgo {
+  margin-top: 2px;
+  color: var(--mu);
+  font-size: 11px;
+}
+.lgo.o-bounce,
+.lgo.o-break {
+  color: var(--tx);
+}
+.almore {
+  display: flex;
+  margin: 6px auto 0;
+}
 .t-ml,
 .k-ml {
   --k: var(--ac);

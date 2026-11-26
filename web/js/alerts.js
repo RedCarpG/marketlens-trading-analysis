@@ -23,7 +23,8 @@ Alerts.register((s, c) => console.log('[signal]', c.symbol, c.tf, s.t));
    切换品种/周期时清空状态重新建立基准，避免一打开就被历史状态刷屏 */
 /* ck：开仓体检（新开一笔时对照我的守则，见 journal.js 的 checkNewPositions）；ml：我画的线 */
 let AL = { on: 0, lv: 1, sc: 1, sl: 1, ev: 1, ck: 1, ml: 1, ...LS.get('alerts', {}) },
-  alLog = [],
+  /* 预警记录：存在浏览器本地（marketlens.allog），新的在前，最多 AL_MAX 条；整理和“之后怎样了”的判定在 core/alertlog.js */
+  alLog = normLog(LS.get('allog', [])),
   alArm = {},
   alSc = null,
   alKey = '';
@@ -45,14 +46,14 @@ function evalAlerts(m) {
   const st = { arm: alArm, sc: alSc };
   alCheck(m, tf, now, st, { lv: AL.lv, sc: AL.sc, dp: cur.p }).forEach(h => {
     const s = alText(h, { sym: cur.sym, name: ciName(), T: tf, px: now, dp: cur.p });
-    alFire(s.text, s.kind, s.say, s.ck);
+    alFire(s.text, s.kind, s.say, s.ck, h.type == 'lv' ? { lp: h.l.p, atr: x } : null);
   });
   alSc = st.sc;
   /* 我画的线：和关键价位同一套布防（进入 ±0.15 ATR 提醒，离开 0.5 ATR 后重新布防），交给 Cirra 时也归到关键价位 */
   if (AL.ml)
     lineCheck(myLines(), now, x, alArm).forEach(l => {
       const s = lineText(l, { sym: cur.sym, name: ciName(), T: tf, px: now, dp: cur.p });
-      alFire(s.text, s.kind, s.say, s.ck);
+      alFire(s.text, s.kind, s.say, s.ck, { ty: 'ml', lp: l.p, atr: x });
     });
   /* 我的止损/止盈：进入 0.5 ATR 提醒，离开 1 ATR 后重新布防 */
   if (AL.sl && TR && TR.sym === cur.sym)
@@ -75,11 +76,27 @@ function evalAlerts(m) {
       })
     );
 }
-/* 发出提醒：页面右下角弹出提示 + 系统通知（已授权时）+ 记入最近预警 + 交给桌宠 Cirra（勾选了这一类时，见 cirra.js）；
-   不在预警页时“预警”标签计未读。say 为给 Cirra 念的短句（没有时念 text），ck 为交给她的类型（决定表情，默认同 kind） */
-function alFire(text, kind, say, ck = kind) {
-  alLog.unshift({ t: Date.now(), text, kind });
-  alLog = alLog.slice(0, 20);
+/* 发出提醒：页面右下角弹出提示 + 系统通知（已授权时）+ 记入预警记录 + 交给桌宠 Cirra（勾选了这一类时，见 cirra.js）；
+   不在预警页时“预警”标签计未读。say 为给 Cirra 念的短句（没有时念 text），ck 为交给她的类型（决定表情，默认同 kind）。
+   ex：记录里多带的东西——ty 记录的类型（不给时从 ck 推出来），价位类另给 lp 价位、atr 当时的 ATR，之后用来判定怎样了 */
+let alSeq = 0;
+function alFire(text, kind, say, ck = kind, ex) {
+  const t = Date.now(),
+    b = bars.length ? bars[bars.length - 1] : null;
+  alLog = logAdd(alLog, {
+    id: t.toString(36) + '-' + (alSeq++).toString(36),
+    t,
+    sym: cur.sym,
+    tf,
+    ty: (ex && ex.ty) || alTyOf(ck),
+    kind,
+    text,
+    px: b ? b.close : null,
+    dp: cur.p,
+    src: cur.src,
+    ...(ex && ex.lp != null && b ? { lp: ex.lp, atr: ex.atr, bt: b.timestamp } : null),
+  });
+  LS.set('allog', alLog);
   if (TAB != 'al') alNew++;
   toast(text, kind);
   if ('Notification' in window && Notification.permission === 'granted')
@@ -123,6 +140,55 @@ async function setAlertsOn(v) {
   refresh();
 }
 
+/* ===== 预警记录：价位类的补一句“之后怎样了” =====
+   只看当前品种、当前数据源、K线已经加载的周期（lvOutcome 还会核对当时的价格在不在那根K线里）。
+   有了结论（反弹 / 突破 / 未定）就写进记录存起来，以后换了品种、K线不在了也看得到；还在看的不存，来了新K线再算。
+   模拟行情每次打开页面都重新生成，只判定这次打开以后记下的。alWait：记录 id → 还在看的结果，给面板显示 */
+const AL_T0 = Date.now();
+let alWait = {},
+  alOSig = '';
+function alOutcomes() {
+  if (!bars.length || cur.src == 'csv') return;
+  const last = bars[bars.length - 1],
+    sig = [cur.sym, cur.src, tf, bars.length, last.timestamp, alLog.length, alLog.length ? alLog[0].id : ''].join('|');
+  if (sig === alOSig) return;
+  alOSig = sig;
+  alWait = {};
+  const cl = {};
+  let ch = 0;
+  for (const r of alLog) {
+    if (r.o || r.lp == null || r.sym != cur.sym || r.src != cur.src || !ALL[r.tf]) continue;
+    if (cur.src == 'demo' && r.t < AL_T0) continue;
+    const o = lvOutcome(r, cl[r.tf] || (cl[r.tf] = closed(r.tf, ALL[r.tf])));
+    if (!o) continue;
+    if (o.st == 'wait') alWait[r.id] = o;
+    else {
+      r.o = o.st;
+      r.ok = o.k;
+      if (o.both) r.ob = 1;
+      ch = 1;
+    }
+  }
+  if (ch) LS.set('allog', alLog);
+}
+/* 预警页“预警记录”的筛选（alF：all 或某个类型）、一次显示多少条（alShow）、清空（要点两次：第一次点完按钮变成“再点一次清空”，4 秒内有效） */
+let alF = 'all',
+  alShow = 30,
+  alClr = 0;
+function alClear() {
+  if (Date.now() - alClr > 4000) {
+    alClr = Date.now();
+    setTimeout(alRedraw, 4100);
+  } else {
+    alClr = 0;
+    alLog = [];
+    alWait = {};
+    alF = 'all';
+    alShow = 30;
+    LS.set('allog', alLog);
+  }
+  alRedraw();
+}
 function alRedraw() {
   if (typeof pane == 'function' && pane('al')) morph(pane('al'), alPanel());
 }
