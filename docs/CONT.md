@@ -82,7 +82,9 @@ Cirra 插件 1.1.0（2026-11-26，路线图第 2 步，在 X:\Project\Cirra\cirr
 
 第 4 步收尾（2026-11-27）：main 已推送；发了 Release core-v0.2.0（下载下来的哈希和插件 lockfile 里的一致）；插件依赖换成 Release 地址，合进 cirra-plugins 的本地 DEV（c728f1c，合并后的提交上插件测试 51 项、类型检查通过，dist 里已是 1.2.0），临时工作区和功能分支删了。cirra-plugins 没有推送（归它的管理会话）。注意：代理的常驻预警已经默认不开，Cirra 里的插件更新并打开之前没有人盯价位。
 
-下一步：用户在 Cirra 里更新并打开插件、验收（第 2、4 步）；在交易页定自己的守则，用真实交易看复盘面板（第 3 步）；然后是路线图第 5 步（情境）。见 docs/ROADMAP.md §5。情景入场条件仍无优势，不再细调；GC数据（eToro Micro Gold期货拼接连续合约或另找GC源）以后再议。
+第 5 步第一批（2026-11-27，云端会话，分支 claude/busy-tesla-2iwogl，开了到 main 的 PR，没有自己合）：路线图的 B4、B2、C1、C3 四项，都不依赖本机数据。新增 web/js/core/context.js（波动状态 volState / volText；交易时段 SESS / sessOf / sessBands / sessStats，core/review.js 的时段分组改用这一份）和 web/js/core/alertlog.js（我画的线 normLines / addLine / lineCheck / lineText；预警记录 normLog / logAdd；价位类预警之后怎样了 lvOutcome / outcomeText / outcomeStats），都加进了 core/files.js 的 FILES 和 web/index.html，对外接口 API 和包版本没动。页面：分析页“关键数值”里多一句波动状态、最下面多一块“交易时段”；“标注”菜单多一项“交易时段”（默认关，只在 15 分钟、1 小时周期画）；预警页多一个勾选项“我画的线”、一块“我画的线”（输入价格或在图上点），“最近预警”换成存在浏览器本地的“预警记录”（按类型筛、清空、价位类的补一句之后怎样了）。本地存储多两个键：marketlens.mylines、marketlens.allog。改到的界面文件：alerts.js、panel.js、marks.js、app.css，另有 app.js 一行（标注菜单里“交易时段”的说明）。测试 tests/context.test.js、tests/alertlog.test.js，共 110 项通过；无头浏览器里用模拟品种把四项走了一遍，深色、浅色、窄屏都看过。没验证的：真实行情下的样子、Cirra 真的开口、系统通知。细节见 SPEC 3.3.14。过程中看到两处原来就有的问题，没有顺手改，写在 PR 说明里：浅色主题下图上一部分价位标签成了实心色块（标签底色用 `#fff` 拼透明度得到无效颜色）；窄屏下页面可以横向滚动（收起的顶栏下拉菜单撑宽了页面）。
+
+下一步：验收这个 PR 并合进 main；用户在 Cirra 里更新并打开插件、验收（第 2、4 步）；在交易页定自己的守则，用真实交易看复盘面板（第 3 步）；然后是第 5 步剩下的 B1（事件研究）、D1（关键价位统计），要用本机 var/ 里的历史K线。见 docs/ROADMAP.md §5。情景入场条件仍无优势，不再细调；GC数据（eToro Micro Gold期货拼接连续合约或另找GC源）以后再议。
 
 已定（2026-10-22）：先用eToro GOLD（黄金CFD），GC期货数据源以后再议。
 待定：Binance适配器是否需要验证；v0.3中未写入项目说明的内容（手动ChatGPT分析包、SQLite留痕）是否还要。（经济日历与新闻的真实联调已于 2026-11-26 通过；DATA_VALIDATION.md 已归档。）GitHub：当前仓库 https://github.com/RedCarpG/marketlens-trading-analysis（公开；2026-10-24 由 web-trading-MarketLens-app 改名；命名：全小写连字符，品牌名 + 用途；main），.env、server/node_modules、work/ 均未上传。
