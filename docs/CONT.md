@@ -2,7 +2,7 @@
 
 （2026-10-24 由 FinBot 更名为 MarketLens；本地目录同日改为 X:\Project\MarketLens，浏览器本地偏好键前缀改为 marketlens. 并自动迁移旧的 finbot.*）
 
-更新：2026-10-25；状态：规格v0.4；当前阶段：eToro GOLD 数据源、交易记录、复盘、经济日历与新闻均已接入。密钥配置、真实联调记录、个人交易记录与复盘结果只保存在本地 docs/private/LOCAL_NOTES.md（不入 Git）。
+更新：2026-11-26；状态：规格v0.4；当前阶段：eToro GOLD 数据源、交易记录、复盘、经济日历与新闻、Cirra 播报与常驻预警均已接入；之后的方向和顺序见 docs/ROADMAP.md。密钥配置、真实联调记录、个人交易记录与复盘结果只保存在本地 docs/private/LOCAL_NOTES.md（不入 Git）。
 
 目标：个人行情观察与分析工具，以黄金期货GC为主，KLineChart图表，规则评分与参考计划，后续加预警与回测；只读行情，不下单。分析方法为自上而下多周期：1M/1w定背景→1d结构→4h区域→1h/15m触发（SPEC 3.5节）；页面已实现1w/1M、analyzeMTF与周期状态矩阵初版（仅模拟数据验证，权重未回测）。
 
@@ -48,13 +48,21 @@
 
 交易页金额币种（2026-10-25）：可选美元 / 欧元 / 人民币；eToro 交易账户金额为美元、接口不提供换币种，代理新增 `/api/fx`（eToro EURUSD / USDCNH 日线，取不到用 Yahoo）；已平仓按平仓日汇率、持仓按当前汇率，交易页、图上标注、悬停、复盘、预警都标币种。
 
+代理常驻预警（2026-11-02）：server/watch.js 在页面关着时看价位和情景并交给 Cirra，判定与页面共用 core/alertrules.js；转发带 source=market 和 kind；止损止盈仍只在页面。见 docs/CIRRA.md §9。
+
 桌宠 Cirra 播报第①步（2026-11-01）：用户的桌宠 Cirra（cirra-deskpet）能把消息说出来，按 docs/CIRRA.md 的计划接入。代理新增 server/cirra.js 与 /api/cirra/status、POST /api/cirra/notify（唯一收 POST 的地址，限本机页面的 JSON），读 ~/.cirra/endpoint.json 转给她的 /notify；她没开时静默跳过，token 换了重读，每分钟最多 8 条，表情按类型定。页面 alFire 多一个出口（web/js/cirra.js），每类预警另写一句口语化的短句；预警页加“Cirra 播报”块（总开关默认开；经济事件、止损止盈默认播，价位、情景默认不播；试一下；她在不在）。Cirra 那边不改代码。测试 tests/cirra.test.js；另用 cirra-deskpet 自己的事件端口代码当真 Cirra 联调通过，浏览器检查过；她真正开口要本机验证。详见 SPEC 3.3.11。下一步：第②步代理自己播报经济日历与早报。
 
-下一步候选：情景入场条件仍无优势，不再细调；经济日历与新闻首次本机运行时核对来源状态；GC数据（eToro Micro Gold期货拼接连续合约或另找GC源）以后再议。
+路线图与第 0 步收尾（2026-11-26）：写了 docs/ROADMAP.md（定位、作为 Cirra 一部分的做法、方向、顺序）。第 0 步：
+- 真机核对：经济日历与新闻的五个来源都取到；页面显示 Cirra 在线，“试一下”发出并被收下，但 Cirra 里“MarketLens 行情”插件当时没开，所以她没说（插件没开时她照样回成功，这边看不出来）；常驻预警用 eToro GOLD 1h 跑了一轮，真正碰到价位的那次还没等到。
+- 代理开机自启：tools/autostart.ps1（启动文件夹里一个快捷方式，后台运行，输出写 var/proxy.log），已在本机装上；端口被占用时代理给一句说明后退出。
+- 文档：DATA_VALIDATION.md 移到 archive；SPEC 第 5 节指向 ROADMAP；server/README.md 去掉“未经真实联调”和作废的 notifyLabel。
+- 远端分支 ccr-bd0a1e8b-mxsb48 在第①步之后和本地分叉：它有代理播日历（已取消）和 AI 分析（docs/AI.md、分析包、让 Cirra 分析、留痕打分），没有常驻预警；本地相反。main 提交的是本地这条线，那个分支留着没动，AI 分析要不要合进来待定（ROADMAP §6）。它依赖的 Cirra 接口 `POST /ask`（cirra-deskpet 分支 marketlens/ask）现在的 Cirra 里没有。
+
+下一步：见 docs/ROADMAP.md §5。情景入场条件仍无优势，不再细调；GC数据（eToro Micro Gold期货拼接连续合约或另找GC源）以后再议。
 
 已定（2026-10-22）：先用eToro GOLD（黄金CFD），GC期货数据源以后再议。
-待定：Binance适配器是否需要验证；v0.3中未写入项目说明的内容（手动ChatGPT分析包、SQLite留痕）是否还要；经济日历与新闻在本机首次运行时的真实联调。DATA_VALIDATION.md仍按XAU/USD撰写，未更新。GitHub：当前仓库 https://github.com/RedCarpG/marketlens-trading-analysis（公开；2026-10-24 由 web-trading-MarketLens-app 改名；命名：全小写连字符，品牌名 + 用途；main），.env、server/node_modules、work/ 均未上传。
+待定：Binance适配器是否需要验证；v0.3中未写入项目说明的内容（手动ChatGPT分析包、SQLite留痕）是否还要。（经济日历与新闻的真实联调已于 2026-11-26 通过；DATA_VALIDATION.md 已归档。）GitHub：当前仓库 https://github.com/RedCarpG/marketlens-trading-analysis（公开；2026-10-24 由 web-trading-MarketLens-app 改名；命名：全小写连字符，品牌名 + 用途；main），.env、server/node_modules、work/ 均未上传。
 
-环境：Node v18.14.0（已停止维护，代理可运行，建议升级）、Python 3.10.1、Git 2.35.1、Docker 26.0.0。
+环境：Node v24.22.1（2026-11-26 核对；此前为 v18.14.0）、Python 3.10.1、Git 2.35.1、Docker 26.0.0。
 
-文件：docs/SPEC.md当前规格；docs/archive/SPEC-v0.1~v0.3.md历史；server/（index.js、etoro.js、README.md）；.env.example；docs/OPEN_SOURCE_REVIEW.md早期选型（图表推荐已被KLineChart取代）；work/references/TradingAgents研究副本。
+文件：docs/SPEC.md当前规格；docs/ROADMAP.md路线图；docs/archive/SPEC-v0.1~v0.3.md历史；server/（index.js、etoro.js、README.md）；.env.example；docs/OPEN_SOURCE_REVIEW.md早期选型（图表推荐已被KLineChart取代）；work/references/TradingAgents研究副本。

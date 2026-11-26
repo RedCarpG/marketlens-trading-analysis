@@ -21,4 +21,5 @@
 - `web/` 页面（KLineChart 9.8，普通脚本，无构建步骤）；`web/js/core/` 为纯计算，可在 Node 中测试；`web/js/data.js` 为数据源适配器，每个数据源一项
 - `server/` 本地代理（Node.js：行情与实时推送、交易记录、本地K线存储、经济日历与新闻）
 - `tests/` `npm test`（Node 自带 node:test）
-- `docs/SPEC.md` 规格与设计记录；`docs/CONT.md` 进度记录
+- `tools/` 回测与导入历史数据的命令行；`autostart.ps1` 让代理在 Windows 登录后自己在后台启动（见 server/README.md）
+- `docs/SPEC.md` 规格与设计记录；`docs/CONT.md` 进度记录；`docs/ROADMAP.md` 路线图
