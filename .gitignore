@@ -12,3 +12,6 @@ node_modules/
 *.log
 # 只在本地：密钥配置、真实联调记录、个人交易记录
 docs/private/
+# marketlens-core 打出来的包（npm run pack:core）
+core/dist/
+core/*.tgz

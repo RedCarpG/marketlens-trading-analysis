@@ -319,6 +319,7 @@ X:\Project\MarketLens\      （2026-10-24 由 FinBot 改名）
 ├─ tests\                 node:test 测试（核心规则单元测试 + 拆分前标准答案回归测试）
 ├─ docs\                  SPEC、CONT、ROADMAP（路线图）、开源选型；archive\为历史规格和早期的数据核验计划
 ├─ tools\                 回测、导入历史数据的命令行；autostart.ps1 代理开机自启（Windows）
+├─ core\                  marketlens-core 包：加载器、打包脚本、类型（源码就是 web\js\core\，见第 11 节）
 ├─ server\                Node.js本地代理（保管eToro密钥并托管页面）
 ├─ .env.example           密钥模板；复制为 .env 填写（.env 不入Git）
 └─ work\                  参考源码副本（不入Git）
@@ -389,6 +390,9 @@ web/
    │  ├─ alertrules.js     价位和情景预警的判定与句子（页面和代理共用）
    │  ├─ money.js          金额币种与汇率换算（CCY / fxAt / fmtMoney）
    │  ├─ backtest.js       回测引擎（逐根回放、模拟成交、出场规则、统计；页面回测面板与命令行共用，见 docs/BACKTEST.md）
+   │  ├─ aipack.js         AI 分析包与提问模板（buildPack/packPrompt）
+   │  ├─ aiscore.js        AI 分析记录的前瞻打分（scoreAi/aiStats）
+   │  ├─ summary.js        给页面以外的调用方：从K线直接得到分析、压成几句事实（analyzeCandles/describeState）；页面不加载
    │  └─ demo.js           模拟行情
    ├─ config.js            DOM 简写、自选列表、本机偏好存储（含 finbot.* → marketlens.* 迁移）
    ├─ ui.js                局部更新（morph）、分段/标签滑块
@@ -411,5 +415,20 @@ web/
 
 - 各文件共享全局作用域（普通脚本，非 ES 模块）：只有 app.js 末尾的 `init()` 和少量常量初始化在加载时执行，其余都是函数，调用时才互相引用，所以除“config.js 在前、app.js 最后”外顺序不敏感。
 - 代理只托管 `web/` 下的 html/css/js（路径规范化后必须仍在 web/ 内），旧地址 `/market-analyzer.html` 302 跳到首页。
-- 测试：项目根目录 `npm test`（Node 自带 node:test）。`tests/load-core.js` 在 vm 中按浏览器顺序加载 core/；`tests/golden.test.js` 对比 `tests/fixtures/golden-demo.json`（模拟数据，不含真实行情）；`tests/review.test.js` 验证复盘只用开仓前已收盘的K线并与 analyzeMTF 一致；`tests/store.test.js` 验证K线存储合并与读写；`tests/core.test.js` 为时间网格、已收盘判断、摆动点、前高前低、价位合并、情景触发（含收紧选项）、汇率取值与金额格式等单元测试；`tests/backtest.test.js` 验证回测不偷看未来、只限定入场区间、模拟成交规则、统计函数，并在随机游走数据上做空白对照；`tests/import-history.test.js` 验证历史导入的清洗、日期归一与周线/月线聚合；`tests/yahoo.test.js` 验证 Yahoo 数据的解析、清洗、日内对齐与聚合（不联网）；`tests/events.test.js` 验证经济日历与新闻（美东时间与夏令时换算、Forex Factory / BLS 日程 / RSS / Atom 解析、与官方日程核对合并、BLS 数值计算、缓存与失败回退、改期替换、公布后重查官方数据）；`tests/cirra.test.js` 验证桌宠 Cirra 播报（按她的协议发送、她没开时跳过、token 更换后重读、限速、状态，以及代理 `/api/cirra/notify` 的拒绝规则和按类型定表情）；`tests/aiscore.test.js` 验证 AI 分析留痕（记录读写、倾向解析、meta 清洗）与前瞻打分；`tests/aipack.test.js` 验证 AI 分析包（内容、范围、截短、未覆盖的写法、大小）；`tests/aiscore.test.js` 验证分析记录的打分；`tests/watch.test.js` 验证代理的常驻预警（首轮只建基准、到价说一次、重启不重复、间隔太久重新建基准）。回测命令行 `npm run backtest`（tools/backtest.js，读本地K线存储或 `--data` 指定的导入历史，结果写到 var/backtest/）；`npm run import`（tools/import-history.js）从 Yahoo（黄金期货日线）、Binance（分页）或 CSV 导入长周期历史到 var/history/；`npm run bt:compare`（tools/bt-compare.js）按事先定好的几组情景规则并行回放、计入成本对比。核心算法有意改动时需重新生成标准答案。
+- 测试：项目根目录 `npm test`（Node 自带 node:test）。`core/load.js` 在 vm 中按浏览器顺序加载 web/js/core/（`tests/load-core.js` 只是转一下）；`tests/summary.test.js` 验证 analyzeCandles 与 describeState；`tests/corepkg.test.js` 验证打出来的 marketlens-core 包与源码结果一致（见第 11 节）；`tests/golden.test.js` 对比 `tests/fixtures/golden-demo.json`（模拟数据，不含真实行情）；`tests/review.test.js` 验证复盘只用开仓前已收盘的K线并与 analyzeMTF 一致；`tests/store.test.js` 验证K线存储合并与读写；`tests/core.test.js` 为时间网格、已收盘判断、摆动点、前高前低、价位合并、情景触发（含收紧选项）、汇率取值与金额格式等单元测试；`tests/backtest.test.js` 验证回测不偷看未来、只限定入场区间、模拟成交规则、统计函数，并在随机游走数据上做空白对照；`tests/import-history.test.js` 验证历史导入的清洗、日期归一与周线/月线聚合；`tests/yahoo.test.js` 验证 Yahoo 数据的解析、清洗、日内对齐与聚合（不联网）；`tests/events.test.js` 验证经济日历与新闻（美东时间与夏令时换算、Forex Factory / BLS 日程 / RSS / Atom 解析、与官方日程核对合并、BLS 数值计算、缓存与失败回退、改期替换、公布后重查官方数据）；`tests/cirra.test.js` 验证桌宠 Cirra 播报（按她的协议发送、她没开时跳过、token 更换后重读、限速、状态，以及代理 `/api/cirra/notify` 的拒绝规则和按类型定表情）；`tests/aiscore.test.js` 验证 AI 分析留痕（记录读写、倾向解析、meta 清洗）与前瞻打分；`tests/aipack.test.js` 验证 AI 分析包（内容、范围、截短、未覆盖的写法、大小）；`tests/aiscore.test.js` 验证分析记录的打分；`tests/watch.test.js` 验证代理的常驻预警（首轮只建基准、到价说一次、重启不重复、间隔太久重新建基准）。回测命令行 `npm run backtest`（tools/backtest.js，读本地K线存储或 `--data` 指定的导入历史，结果写到 var/backtest/）；`npm run import`（tools/import-history.js）从 Yahoo（黄金期货日线）、Binance（分页）或 CSV 导入长周期历史到 var/history/；`npm run bt:compare`（tools/bt-compare.js）按事先定好的几组情景规则并行回放、计入成本对比。核心算法有意改动时需重新生成标准答案。
 - 格式化：`npm run format`（Prettier 3.3.3，配置见 `.prettierrc.json`）。
+
+## 11. 核心库 marketlens-core（2026-11-26，路线图第 1 步）
+
+把 `web/js/core/` 的纯计算做成一个别的程序能装的包，第一个用它的是 Cirra 的插件“MarketLens 行情”（路线图第 2 步）。设计上的几条：
+
+- **源码只有一份**：就是页面用的 `web/js/core/`（普通脚本，没有 import / export），不改写、不复制。页面照旧不用构建。
+- **两种用法**：`core/load.js` 在 vm 里按顺序加载源码，不用构建，本地代理（server/watch.js）、命令行工具、测试用它（以前是 `tests/load-core.js`，正式代码依赖测试目录，现在不了）；`core/build.js` 把这些脚本按 `core/files.js` 的顺序拼成一个文件、末尾补导出，出 `dist/index.mjs` 和 `dist/index.cjs`，`npm run pack:core` 打成 tgz，给别的程序装。`dist/` 和 tgz 不入 Git。
+- **对外的接口**（`core/files.js` 的 `API`，类型和说明在 `core/index.d.ts`）：`analyzeCandles`、`describeState`、`ctx`、`analyzeMTF`、`isKey`、`mainLv`、`prevHL`、`alCheck`、`alText`、`buildPack`、`packPrompt`、`scoreAi`、`aiStats`、`TFS`、`TFN`、`nxt`、`closed`、`VERSION`。加名字升小版本，改、删已有的升大版本。
+- **新加的两个函数**（`core/summary.js`，页面不加载）：
+  - `analyzeCandles(tf, all, px?)`：给各周期K线，直接得到 `{ tf, C, px, m }`，调用方不用自己拼 ctx 和 analyzeMTF。
+  - `describeState({ ...分析, name, dp })`：压成四句只有事实的话——现价、各周期方向（按均线）、离最近的关键支撑和阻力几个 ATR（就在价位上时说“就在……附近”，没有算出来时照实说）、平常的波动；同时给出结构化的 `facts`。**故意不带评分、结论和情景**：回测没有可靠优势，说出来容易被当成建议。
+- **包里没有网络请求**：K线由调用方自己取。取数搬进包是路线图第 4 步的事。
+- 模块里是严格模式，和页面的普通脚本略有不同，所以 `tests/corepkg.test.js` 把包打到临时目录，用两份（import、require）和源码各算一遍分析、摘要、预警、分析包，逐字段比较；同时核对导出的名字、类型文件、页面加载的脚本都在清单里、正式代码不引用 `tests/`。
+- 验证（2026-11-26）：测试 76 项通过；用后台代理的真实 eToro GOLD K线跑了打出来的包，1 小时和日线都说得出摘要，日线的最近支撑（3499.49）和阻力（3886.15）与页面图上标的一致；把 tgz 装进一个空项目，`require('marketlens-core')` 和 `import` 都能用。
+- 发版：tgz 挂到 GitHub Release（标签 `core-v<版本>`），做法见 `core/README.md`。0.1.0 已在本机打出，还没有发到 Release。

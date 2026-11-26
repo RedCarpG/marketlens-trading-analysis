@@ -1,0 +1,30 @@
+{
+  "name": "marketlens-core",
+  "version": "0.1.0",
+  "description": "MarketLens's reckoning for other programs: multi-timeframe state, key levels, alert rules and plain-text summaries for AI. Read-only facts, no trading advice.",
+  "license": "UNLICENSED",
+  "author": "RedCarpG",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RedCarpG/marketlens-trading-analysis",
+    "directory": "core"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "index.d.ts",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -8,7 +8,7 @@
 const fs = require('fs');
 const path = require('path');
 const { createStore } = require('../server/store');
-const { loadCore } = require('../tests/load-core');
+const { loadCore } = require('../core/load');
 
 const ROOT = path.join(__dirname, '..');
 const arg = (k, d) => {

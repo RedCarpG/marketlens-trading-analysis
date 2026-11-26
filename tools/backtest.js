@@ -7,7 +7,7 @@
 //       --cost 按预设计入成本（见 COSTS）；--sc loose=0,htf=1,cool=10 换情景触发规则（见 web/js/core/scenarios.js）
 const fs = require('fs');
 const path = require('path');
-const { loadCore } = require('../tests/load-core'); // 与测试共用：在 vm 里按浏览器顺序加载 core/
+const { loadCore } = require('../core/load'); // 在 vm 里按浏览器顺序加载 web/js/core/
 const { toMonths } = require('../server/etoro'); // 月线与代理同一算法：近期由日线聚合，更早的由周线归月
 
 const ROOT = path.join(__dirname, '..');

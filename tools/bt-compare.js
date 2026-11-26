@@ -49,7 +49,7 @@ const MODES = {
 
 /* 一组：回放一次；对每种出场规则各按无成本、有成本统计一次 */
 function job({ dir, cost, hold, from, to, sc, bias, exits }) {
-  const { loadCore } = require('../tests/load-core');
+  const { loadCore } = require('../core/load');
   const { loadDir, COSTS } = require('./backtest');
   const get = loadCore(),
     [btRun, btReport, mstat] = ['btRun', 'btReport', 'mstat'].map(get);

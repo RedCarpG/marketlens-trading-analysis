@@ -5,7 +5,7 @@
    - 不补说：状态存在文件里，重启不重复；但间隔超过 3 个轮询（代理或她关过）就重新建立基准，不说错过的那些。 */
 const fs = require('fs');
 const path = require('path');
-const { loadCore } = require('../tests/load-core'); // 与测试、回测工具共用：在 vm 里按浏览器顺序加载 core/
+const { loadCore } = require('../core/load'); // 不用构建，直接从 web/js/core/ 加载（页面、测试、回测工具用的是同一份）
 const { KIND } = require('./cirra');
 
 const NEED = 500;

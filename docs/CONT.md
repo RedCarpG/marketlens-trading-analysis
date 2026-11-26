@@ -66,7 +66,9 @@ AI 分析第④步（2026-11-03）：留痕与前瞻打分。“让 Cirra 分析
 
 合 AI 分析线（2026-11-26，路线图第 0.5 步）：把分支 ccr-bd0a1e8b-mxsb48 合进 main。留下的：分析包（core/aipack.js）、分析页“AI 分析”块（复制分析包、查看）、代理的 /api/ai/analyze 和 /api/ai/log、留痕与打分（server/ailog.js、core/aiscore.js）。没合的：代理播日历（server/announce.js 和它的测试、CIRRA_EVENTS / CIRRA_CCY / CIRRA_BRIEFING）。改的：“让 Cirra 分析”默认收起，.env 写 CIRRA_ASK=1 才显示（Cirra 主线没有 /ask；她对任何 GET 都回 405，探测不出来，所以用开关）；转给 Cirra 的 source: market 统一在 server/cirra.js 里加；测试里起的代理关掉常驻预警。测试 66 项通过，浏览器里看过分析页和预警页。上面“桌宠 Cirra 播报第①步”之后的三段（代理播日历、AI 分析第①②步、第④步）是分支上 2026-11-03 的原始记录，其中代理播日历没有合进来。
 
-下一步：见 docs/ROADMAP.md §5。情景入场条件仍无优势，不再细调；GC数据（eToro Micro Gold期货拼接连续合约或另找GC源）以后再议。
+核心库第一段（2026-11-26，路线图第 1 步）：新增 core/（marketlens-core 0.1.0）。源码还是 web/js/core/ 那一份；core/load.js 是不用构建的加载器（从 tests/load-core.js 搬过来，代理和命令行工具改用它，server/ 不再引用 tests/），core/build.js 拼成 dist/index.mjs 和 index.cjs，npm run pack:core 打成 tgz。新加 web/js/core/summary.js：analyzeCandles（从K线直接得到分析）和 describeState（四句只有事实的话 + 结构化的 facts，不带评分、结论、情景）。测试 tests/summary.test.js、tests/corepkg.test.js（包和源码逐字段一致），共 76 项通过；用真实 GOLD K线和一个空项目试过打出来的包。tgz 只在本机，还没发 Release，也还没提交。设计见 SPEC 第 11 节、core/README.md。同日删掉了远端旧分支 ccr-bd0a1e8b-mxsb48（内容已全在 main）。
+
+下一步：路线图第 2 步，在 cirra-plugins 里把插件升到 1.1（装 marketlens-core，加问位置的工具、早上那句带位置、事迹）。见 docs/ROADMAP.md §5。情景入场条件仍无优势，不再细调；GC数据（eToro Micro Gold期货拼接连续合约或另找GC源）以后再议。
 
 已定（2026-10-22）：先用eToro GOLD（黄金CFD），GC期货数据源以后再议。
 待定：Binance适配器是否需要验证；v0.3中未写入项目说明的内容（手动ChatGPT分析包、SQLite留痕）是否还要。（经济日历与新闻的真实联调已于 2026-11-26 通过；DATA_VALIDATION.md 已归档。）GitHub：当前仓库 https://github.com/RedCarpG/marketlens-trading-analysis（公开；2026-10-24 由 web-trading-MarketLens-app 改名；命名：全小写连字符，品牌名 + 用途；main），.env、server/node_modules、work/ 均未上传。
