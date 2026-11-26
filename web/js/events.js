@@ -158,7 +158,8 @@ function evalEventAlerts() {
         d <= m * 60e3,
         d > m * 60e3,
         `${evTime(es[0].ts)} ${es[0].ccy} ${ns.slice(0, 3).join('、')}${ns.length > 3 ? ' 等' : ''}即将公布（还有 ${evLeft(d)}）${fc ? '：' + fc : ''}`,
-        'ev'
+        'ev',
+        `${es[0].ccy == 'USD' ? '' : es[0].ccy + ' '}${ns.slice(0, 3).join('、')}${ns.length > 3 ? ' 等' : ''}还有 ${evLeft(d)}公布${fc ? '，' + fc : ''}`
       )
     );
   });
@@ -174,12 +175,20 @@ function evDataAlert() {
       u = g('unemp'),
       c = g('cpi'),
       cc = g('core'),
-      parts = [];
-    if (n && ref[0] != evDataRef[0])
+      pct = x => x.val.toFixed(x.dp) + '%',
+      /* 念给 Cirra 的：非农千人 → “新增 18 万” */
+      wan = v => (v < 0 ? '减少 ' : '新增 ') + +(Math.abs(v) / 10).toFixed(1) + ' 万',
+      parts = [],
+      say = [];
+    if (n && ref[0] != evDataRef[0]) {
       parts.push(`${+n.ref.slice(5)}月非农 ${dv(n)}（前值 ${dv(n, 1)}）${u ? '，失业率 ' + dv(u) : ''}`);
-    if (c && ref[1] != evDataRef[1])
+      say.push(`${+n.ref.slice(5)} 月非农${wan(n.val)}${u ? '，失业率 ' + pct(u) : ''}`);
+    }
+    if (c && ref[1] != evDataRef[1]) {
       parts.push(`${+c.ref.slice(5)}月 CPI 年率 ${dv(c)}${cc ? '，核心 ' + dv(cc) : ''}`);
-    if (parts.length) alFire('BLS 公布：' + parts.join('；'), 'ev');
+      say.push(`${+c.ref.slice(5)} 月 CPI 年率 ${pct(c)}${cc ? '，核心 ' + pct(cc) : ''}`);
+    }
+    if (parts.length) alFire('BLS 公布：' + parts.join('；'), 'ev', 'BLS 公布了：' + say.join('；'));
   }
   evDataRef = ref;
 }

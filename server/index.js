@@ -10,6 +10,8 @@
    GET /api/fx?ccy=EUR|CNY                              → 汇率：1 美元 = ? 目标货币的日线与当前值（交易页金额换算用）
    GET /api/events/calendar                             → 经济日历（Forex Factory + BLS / 美联储官方日程）与 BLS 最新官方数据
    GET /api/events/news?topic=&lang=                    → 新闻（RSS，按主题和语言）
+   GET /api/cirra/status                                → 桌宠 Cirra 开没开（见 cirra.js）
+   POST /api/cirra/notify  { text, kind }               → 让 Cirra 把一条预警说出来（唯一收 POST 的地址）
    密钥只从项目根目录 .env 读取，不发给前端、不写日志。 */
 const http = require('http'), fs = require('fs'), path = require('path');
 const { WebSocketServer } = require('ws');
@@ -17,6 +19,7 @@ const { TFS, createClient, createTrader, advance, pickPrice, Upstream } = requir
 const { createStore } = require('./store');
 const { createYahoo } = require('./yahoo');
 const { createEvents, parseFeeds, TOPIC, LANGS } = require('./events');
+const { createCirra, KIND } = require('./cirra');
 
 const ROOT = path.resolve(__dirname, '..');
 function loadEnv(f) {
@@ -99,6 +102,8 @@ const TKEYS = !!(E.ETORO_TRADE_API_KEY && E.ETORO_TRADE_USER_KEY);
 const trader = createTrader({ apiKey: E.ETORO_TRADE_API_KEY, userKey: E.ETORO_TRADE_USER_KEY, baseUrl: E.ETORO_BASE_URL || 'https://public-api.etoro.com' });
 /* 经济日历与新闻：公开来源，不需要密钥；拉到的日历存在 var/events（EVENTS_DIR 可改位置） */
 const events = createEvents({ dir: E.EVENTS_DIR || path.join(ROOT, 'var', 'events'), ua: E.EVENTS_UA || undefined, blsKey: E.BLS_API_KEY || '', feeds: parseFeeds(E.NEWS_FEEDS) });
+/* 桌宠 Cirra：读她写的 endpoint 文件，把预警转给她的 /notify */
+const cirra = createCirra(E.CIRRA_ENDPOINT_FILE ? { file: E.CIRRA_ENDPOINT_FILE } : {});
 
 /* 页面文件：只托管 web/ 目录下的 html/css/js；路径规范化后必须仍在 web/ 内，防止 ../ 穿越读到 .env 等 */
 const WEB = path.join(ROOT, 'web');
@@ -121,6 +126,19 @@ function json(res, code, body) {
   res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
   res.end(JSON.stringify(body));
 }
+/* 读请求体：超过 max 字节返回 null（多出来的读掉丢弃，好正常回 413） */
+function readBody(req, max) {
+  return new Promise(resolve => {
+    const chunks = [];
+    let n = 0;
+    req.on('data', c => {
+      n += c.length;
+      if (n <= max) chunks.push(c);
+    });
+    req.on('end', () => resolve(n > max ? null : Buffer.concat(chunks).toString('utf8')));
+    req.on('error', () => resolve(null));
+  });
+}
 function params(u) {
   const src = u.pathname.startsWith('/api/etoro/') ? 'etoro' : u.searchParams.get('src') || '', S = SRCS[src];
   if (!S) return { err: `src 须为 ${Object.keys(SRCS).join('/')}` };
@@ -133,12 +151,29 @@ function params(u) {
 
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://local');
-  if (req.method !== 'GET') return json(res, 405, { error: '只支持 GET' });
+  /* 只有“让 Cirra 说一句”收 POST；其余只读 */
+  const isPost = req.method === 'POST' && u.pathname === '/api/cirra/notify';
+  if (req.method !== 'GET' && !isPost) return json(res, 405, { error: '只支持 GET' });
   /* 旧地址（拆分前的单文件页面）跳到首页 */
   if (u.pathname === '/market-analyzer.html') { res.writeHead(302, { location: '/' }); return res.end(); }
   if (!u.pathname.startsWith('/api/') && serveWeb(u, res)) return;
   if (u.pathname.startsWith('/api/') && (!HOSTS.has(req.headers.host) || (req.headers.origin && !ORIGINS.has(req.headers.origin)))) return json(res, 403, { error: 'forbidden' });
   if (u.pathname === '/api/health') return json(res, 200, { ok: true, keys: KEYS, trade: TKEYS, price: PRICE, events: true });
+  /* 桌宠 Cirra。POST 必须带本机页面的 Origin、Content-Type 为 JSON（外站网页发不了：不回 CORS 头，预检过不去）、请求体 ≤ 4 KB；
+     kind 只认预设的几种，表情按 kind 定，不收页面传来的表情。她没开时也回 200（ok: false），页面只显示状态 */
+  if (u.pathname === '/api/cirra/status') return json(res, 200, { ...(await cirra.status()), file: cirra.file });
+  if (isPost) {
+    if (!req.headers.origin || !ORIGINS.has(req.headers.origin)) return json(res, 403, { error: 'forbidden' });
+    if (!/^application\/json\b/i.test(req.headers['content-type'] || '')) return json(res, 415, { error: '只收 application/json' });
+    const raw = await readBody(req, 4096);
+    if (raw == null) return json(res, 413, { error: '请求体太大' });
+    let b;
+    try { b = JSON.parse(raw); } catch { return json(res, 400, { error: '不是合法的 JSON' }); }
+    if (!b || typeof b.text != 'string' || !b.text.trim() || !Object.hasOwn(KIND, b.kind)) return json(res, 400, { error: `须有 text，kind 须为 ${Object.keys(KIND).join('/')}` });
+    const r = await cirra.send({ text: b.text, emotion: KIND[b.kind] });
+    if (!r.ok && r.reason !== 'Cirra 没开') console.warn(`[cirra] ${r.reason}`);
+    return json(res, 200, r);
+  }
   if (u.pathname === '/api/sources') return json(res, 200, { etoro: { ok: KEYS }, yahoo: { ok: true }, history: { ok: true, sets: histSets() } });
   if (u.pathname === '/api/fx') {
     const ccy = u.searchParams.get('ccy') || '';

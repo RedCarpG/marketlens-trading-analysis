@@ -48,6 +48,8 @@
 
 交易页金额币种（2026-10-25）：可选美元 / 欧元 / 人民币；eToro 交易账户金额为美元、接口不提供换币种，代理新增 `/api/fx`（eToro EURUSD / USDCNH 日线，取不到用 Yahoo）；已平仓按平仓日汇率、持仓按当前汇率，交易页、图上标注、悬停、复盘、预警都标币种。
 
+桌宠 Cirra 播报第①步（2026-11-01）：用户的桌宠 Cirra（cirra-deskpet）能把消息说出来，按 docs/CIRRA.md 的计划接入。代理新增 server/cirra.js 与 /api/cirra/status、POST /api/cirra/notify（唯一收 POST 的地址，限本机页面的 JSON），读 ~/.cirra/endpoint.json 转给她的 /notify；她没开时静默跳过，token 换了重读，每分钟最多 8 条，表情按类型定。页面 alFire 多一个出口（web/js/cirra.js），每类预警另写一句口语化的短句；预警页加“Cirra 播报”块（总开关默认开；经济事件、止损止盈默认播，价位、情景默认不播；试一下；她在不在）。Cirra 那边不改代码。测试 tests/cirra.test.js；另用 cirra-deskpet 自己的事件端口代码当真 Cirra 联调通过，浏览器检查过；她真正开口要本机验证。详见 SPEC 3.3.11。下一步：第②步代理自己播报经济日历与早报。
+
 下一步候选：情景入场条件仍无优势，不再细调；经济日历与新闻首次本机运行时核对来源状态；GC数据（eToro Micro Gold期货拼接连续合约或另找GC源）以后再议。
 
 已定（2026-10-22）：先用eToro GOLD（黄金CFD），GC期货数据源以后再议。

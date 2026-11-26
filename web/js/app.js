@@ -675,6 +675,7 @@ function init() {
   load();
   loadSources();
   loadEvents();
+  ciStatus();
 }
 init();
 

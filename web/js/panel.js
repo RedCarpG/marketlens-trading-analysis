@@ -179,6 +179,7 @@ function alPanel() {
 <button class="swb${AL.on ? ' on' : ''}" data-al-on role="switch" aria-checked="${!!AL.on}" title="${AL.on ? '关闭预警' : '开启预警'}"></button></div>
 <div class="opts">${opt('lv', '到达关键价位', '价格进入关键价位 ±0.15 ATR')}${opt('sc', '情景触发 / 失效', '价格行为情景状态变化')}${opt('sl', '接近我的止损 / 止盈', '距离 0.5 ATR 以内（eToro 持仓）')}${opt('ev', '重要经济事件', `${ccyOf().join(' / ')} 高影响事件公布前 30 / 5 分钟；BLS 公布新的非农、CPI 时（需本地代理）`)}</div>
 <div class="note2">价位、情景、止损止盈只监控当前品种和周期，需保持页面打开；开启后自动连接实时行情。${np}。</div>
+${ciPanel()}
 ${blk('all', `最近预警 <span class="n">${Math.min(10, alLog.length)}</span>`, lg)}`;
 }
 /* 右侧可折叠块：标题右侧放该块对应的图上标注开关；开合状态记在本地，默认展开 */
@@ -250,6 +251,8 @@ function initPanel() {
       return setMK(x.dataset.mk);
     }
     if (q('[data-al-on]')) return setAlertsOn(!AL.on);
+    if (q('[data-ci-on]')) return setCiOn(!CI.on);
+    if (q('#cit')) return ciTest();
     if (q('#trr')) return loadTrades();
     if ((x = q('[data-trccy]'))) return x.disabled || setTrCcy(x.dataset.trccy);
     if (q('#trv')) return openReview();
@@ -265,6 +268,12 @@ function initPanel() {
   });
   el.addEventListener('change', e => {
     const c = e.target;
+    /* Cirra 播报的四个勾选 */
+    if (c.dataset.ci) {
+      CI[c.dataset.ci] = c.checked ? 1 : 0;
+      LS.set('cirra', CI);
+      return;
+    }
     if (!c.dataset.al) return;
     AL[c.dataset.al] = c.checked ? 1 : 0;
     LS.set('alerts', AL);
