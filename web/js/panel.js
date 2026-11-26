@@ -154,8 +154,21 @@ ${m.why.length ? blk('why', `评分说明 <span class="n">${m.why.length}</span>
 ${blk('sc', `价格行为情景 <span class="mu">${tf} · 纯K线</span>`, scn, chip('pl', '图上') + '<button class="chip" id="btgo" title="用当前品种的历史K线回测情景、信号和评分（B）">回测</button>')}
 ${blk('lv', `关键价位 <span class="mu">${tf} 及更大</span>`, keys, chip('hl', '前高前低') + chip('sr', '支撑阻力'))}
 ${blk('sg', `近期信号 <span class="n">${sigs.length}</span>`, sgl, chip('ar', '图上'))}
-${blk('kv', `关键数值 <span class="mu">${tf}</span>`, `<div class="row"><span>RSI(14)</span><b>${a.rsi.toFixed(1)}</b></div><div class="row"><span>ATR(14)</span><b>${f(a.a)}</b></div>${a.hv ? '' : '<div class="row"><span>成交量</span><b class="mu">无（放量项不计分）</b></div>'}`)}
+${blk('kv', `关键数值 <span class="mu">${tf}</span>`, `<div class="row"><span>RSI(14)</span><b>${a.rsi.toFixed(1)}</b></div><div class="row"><span>ATR(14)</span><b>${f(a.a)}</b></div>${volBlock()}${a.hv ? '' : '<div class="row"><span>成交量</span><b class="mu">无（放量项不计分）</b></div>'}`)}
 <p class="disc">信号、评分与情景由规则自动生成，初步回测未发现可靠优势，仅作辅助参考，不构成投资建议。演示数据为随机模拟。</p>`;
+}
+/* 波动状态（分析页“关键数值”里，ATR 那一行下面）：当前周期的 ATR(14) 在过去一年里排在什么位置，一句事实 + 一条刻度 + 怎么比的。
+   计算在 core/context.js 的 volState；已收盘K线没变就不重算 */
+let volMemo = { k: '', v: null };
+function volBlock() {
+  const b = closed(tf, bars),
+    k = [cur.sym, cur.src, tf, b.length, b.length ? b[b.length - 1].timestamp : 0].join('|');
+  if (volMemo.k !== k) volMemo = { k, v: volState(b) };
+  const v = volMemo.v;
+  if (!v) return '<div class="volst"><div class="mu sm">波动状态：已收盘K线太少，排不了位</div></div>';
+  return `<div class="volst"><div class="vt">${volText(v, { T: tf, dp: cur.p })}</div>
+<div class="vbar" title="左边是最小，右边是最大"><i style="left:${((v.below / v.n) * 100).toFixed(1)}%"></i></div>
+<div class="mu sm">和它之前 ${v.n} 根已收盘K线（${fmt(tf, v.from)} 起）的 ATR(14) 比，其中 ${v.below} 根比它小。只说波动大小，不说方向。</div></div>`;
 }
 /* 预警页：总开关、三类提醒（可单独勾选）、通知权限状态、最近 10 条预警 */
 function alPanel() {

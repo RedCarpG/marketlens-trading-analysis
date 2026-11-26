@@ -2841,3 +2841,33 @@ button.jtag.on {
 .rvr td:last-child {
   white-space: normal;
 }
+
+/* ===== 路线图第 5 步第一批：波动状态、交易时段、我画的线、预警记录（SPEC 3.3.14） ===== */
+/* 波动状态（分析页“关键数值”里）：一句事实 + 一条刻度（左边最小、右边最大）+ 怎么比的 */
+.volst {
+  margin: 6px 0 4px;
+  padding: 8px 10px;
+  border-radius: var(--rs);
+  background: var(--bg);
+}
+.volst .vt {
+  font-weight: 600;
+}
+.vbar {
+  position: relative;
+  height: 4px;
+  margin: 9px 5px 8px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--mu) 30%, transparent);
+}
+.vbar i {
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--tx);
+  border-radius: 50%;
+  background: var(--pn);
+  transform: translate(-50%, -50%);
+  transition: left 0.6s var(--ease);
+}

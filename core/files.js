@@ -13,6 +13,7 @@ const FILES = [
   'mtf',
   'scenarios',
   'alertrules',
+  'context',
   'review',
   'rules',
   'money',
