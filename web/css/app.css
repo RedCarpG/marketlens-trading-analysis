@@ -2902,3 +2902,91 @@ button.jtag.on {
 .ssr .sv {
   text-align: right;
 }
+/* 我画的线（预警页）：输入价格 / 在图上点；每条线一行，✕ 删掉 */
+.mla {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.mla input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--bd);
+  border-radius: var(--rs);
+  background: var(--bg);
+  color: var(--tx);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+.mla input:focus {
+  outline: none;
+  border-color: var(--ac);
+}
+.mla .chip {
+  flex: none;
+  padding: 3px 10px;
+}
+.mlr {
+  display: grid;
+  grid-template-columns: 6px auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  font-variant-numeric: tabular-nums;
+}
+.mlr .d {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ac);
+}
+.mlx {
+  padding: 0 7px;
+  border-color: transparent;
+  color: var(--mu);
+  font-size: 11px;
+  line-height: 20px;
+}
+.mlx:hover {
+  border-color: var(--bd);
+  color: var(--dn);
+}
+/* “在图上点一下”：鼠标变十字；顶栏下面一条提示 */
+body.mlpick #chart,
+body.mlpick #chart * {
+  cursor: crosshair !important;
+}
+#mlh {
+  position: fixed;
+  z-index: 30;
+  top: calc(var(--tbh, 0px) + 18px);
+  left: calc(var(--L, 0px) + (100vw - var(--L, 0px) - var(--R, 0px)) / 2);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100vw - 24px);
+  padding: 7px 8px 7px 14px;
+  border-color: color-mix(in srgb, var(--ac) 45%, transparent);
+  font-size: 12px;
+  white-space: nowrap;
+}
+#mlh button {
+  flex: none;
+  padding: 1px 9px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.t-ml,
+.k-ml {
+  --k: var(--ac);
+}
+@media (max-width: 900px) {
+  #mlh {
+    top: 8px;
+    left: 50%;
+    white-space: normal;
+  }
+}

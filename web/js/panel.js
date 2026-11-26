@@ -209,7 +209,7 @@ function ssBlock() {
     chip('ss', '图上')
   );
 }
-/* 预警页：总开关、三类提醒（可单独勾选）、通知权限状态、最近 10 条预警 */
+/* 预警页：总开关、几类提醒（可单独勾选）、通知权限状态、我画的线、Cirra 播报、最近 10 条预警 */
 function alPanel() {
   const np = !('Notification' in window)
       ? '浏览器不支持系统通知，只在页面内弹出'
@@ -220,6 +220,31 @@ function alPanel() {
           : '系统通知：开启预警时会请求权限',
     opt = (k, t, s) =>
       `<label class="opt"><span class="ot">${t}<small>${s}</small></span><input type="checkbox" class="sw" data-al="${k}"${AL[k] ? ' checked' : ''}></label>`,
+    /* 我画的线：输入价格或在图上点一下加一条，每条写出离现价几个 ATR，✕ 删掉 */
+    nw = bars.length ? bars[bars.length - 1].close : null,
+    atr = lastM ? lastM.t.a.a : null,
+    lines = cur.src == 'csv' ? [] : myLines(),
+    mls =
+      cur.src == 'csv'
+        ? ''
+        : blk(
+            'mls',
+            `我画的线 <span class="n">${lines.length}</span>`,
+            `<div class="mla"><input id="mlp" type="number" step="any" min="0" inputmode="decimal" placeholder="输入价格" aria-label="要加的线的价格"><button class="chip" id="mlb">加一条</button><button class="chip${mlPick ? ' on' : ''}" id="mlk" title="点一下这里，再到K线图上点要加线的价位；也可以按住 Alt 直接点图">${mlPick ? '到图上点一下…' : '在图上点'}</button></div>
+${
+  lines
+    .map(
+      l =>
+        `<div class="mlr"><i class="d"></i><b>${l.p.toFixed(cur.p)}</b><span class="mu sm">${
+          nw == null
+            ? ''
+            : `现价${l.p > nw ? '上方' : l.p < nw ? '下方' : '就在这'}${atr ? ` · ${(Math.abs(l.p - nw) / atr).toFixed(1)} ATR` : ''}`
+        }</span><button class="mlx" data-mlx="${l.id}" title="删掉这条线">✕</button></div>`
+    )
+    .join('') || `<div class="empty">${cur.sym} 还没有自己画的线</div>`
+}
+<div class="note2">按品种记在这个浏览器里，换周期也在。价格走到线的 ±0.15 ATR（按当前周期的 ATR）时提醒一次，离开 0.5 ATR 以后再回来才会再提醒；加线时价格已经在线上的，这一次不提醒。预警关着时线照样画，只是不响。</div>`
+          ),
     lg =
       alLog
         .slice(0, 10)
@@ -230,8 +255,9 @@ function alPanel() {
         .join('') || '<div class="empty">暂无</div>';
   return `<div class="alh"><div><b>价格预警</b><div class="mu sm">${AL.on ? `<span class="lvd"></span>监控中 · ${cur.sym} · ${tf}` : '未开启'}</div></div>
 <button class="swb${AL.on ? ' on' : ''}" data-al-on role="switch" aria-checked="${!!AL.on}" title="${AL.on ? '关闭预警' : '开启预警'}"></button></div>
-<div class="opts">${opt('lv', '到达关键价位', '价格进入关键价位 ±0.15 ATR')}${opt('sc', '情景触发 / 失效', '价格行为情景状态变化')}${opt('sl', '接近我的止损 / 止盈', '距离 0.5 ATR 以内（eToro 持仓）')}${opt('ck', '开仓体检', '新开一笔时对照我的守则，说哪几条没守（eToro 持仓，每分钟看一次；守则在交易页定）')}${opt('ev', '重要经济事件', `${ccyOf().join(' / ')} 高影响事件公布前 30 / 5 分钟；BLS 公布新的非农、CPI 时（需本地代理）`)}</div>
+<div class="opts">${opt('lv', '到达关键价位', '价格进入关键价位 ±0.15 ATR')}${opt('ml', '我画的线', '价格进入我画的线 ±0.15 ATR；线在下面加。交给 Cirra 时算在“关键价位”那一项里')}${opt('sc', '情景触发 / 失效', '价格行为情景状态变化')}${opt('sl', '接近我的止损 / 止盈', '距离 0.5 ATR 以内（eToro 持仓）')}${opt('ck', '开仓体检', '新开一笔时对照我的守则，说哪几条没守（eToro 持仓，每分钟看一次；守则在交易页定）')}${opt('ev', '重要经济事件', `${ccyOf().join(' / ')} 高影响事件公布前 30 / 5 分钟；BLS 公布新的非农、CPI 时（需本地代理）`)}</div>
 <div class="note2">价位、情景、止损止盈只监控当前品种和周期，需保持页面打开；开启后自动连接实时行情。${np}。</div>
+${mls}
 ${ciPanel()}
 ${blk('all', `最近预警 <span class="n">${Math.min(10, alLog.length)}</span>`, lg)}`;
 }
@@ -304,6 +330,10 @@ function initPanel() {
       return setMK(x.dataset.mk);
     }
     if (q('[data-al-on]')) return setAlertsOn(!AL.on);
+    /* 我画的线（alerts.js） */
+    if (q('#mlb')) return mlAddInput();
+    if (q('#mlk')) return mlPickOn(!mlPick);
+    if ((x = q('[data-mlx]'))) return mlDel(x.dataset.mlx);
     if (q('[data-ci-on]')) return setCiOn(!CI.on);
     if (q('#cit')) return ciTest();
     if (q('#trr')) return loadTrades();
@@ -341,6 +371,10 @@ function initPanel() {
     AL[c.dataset.al] = c.checked ? 1 : 0;
     LS.set('alerts', AL);
     alKey = '';
+  });
+  /* 我画的线：输入框里按回车就加 */
+  el.addEventListener('keydown', e => {
+    if (e.key == 'Enter' && e.target.id == 'mlp') mlAddInput();
   });
   /* 块的开合记在本地；toggle 不冒泡，在捕获阶段统一接收 */
   el.addEventListener(

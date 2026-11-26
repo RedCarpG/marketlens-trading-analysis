@@ -65,6 +65,7 @@ const TXT = {
    我的交易  买=蓝色▲、卖=橙色▼（与涨跌色区分），开平仓之间按盈亏着色的实线，平仓空心圆 + 实心盈亏标签
    我的持仓  粗实线 + 实心标签；我的止损/止盈为虚线 + 空心标签
    经济事件  公布时间所在K线上的竖点线（弱化色）+ 底部空心小标签（非农、CPI、FOMC…）
+   我画的线  贯穿的强调色细实线 + 实心强调色标签“我的线”（别的实心标签都是涨跌色或交易的蓝橙）
    交易时段  很淡的整列底色（亚洲 / 欧洲 / 美国各一种颜色），每段左上角一个小字；只在 15 分钟、1 小时周期画，默认关
    右侧所有价位标签统一由标签层绘制，自动上下错开，不再互相压住 */
 const TRC = [
@@ -800,6 +801,12 @@ function drawMarks(m) {
       });
     }
   }
+  /* 我画的线（alerts.js）：贯穿的强调色细实线 + 右侧实心标签。预警关着也画，线是按品种存的，换周期也在 */
+  if (bars.length && cur.src != 'csv')
+    myLines().forEach(l => {
+      items.push({ name: 'fbLine', points: [{ timestamp: ts, value: l.p }], extendData: { color: A, size: 1 } });
+      lab(l.p, `我的线 ${f(l.p)}`, A, 'fill');
+    });
   items.push(...evMarks());
   if (labs.length)
     items.push({
