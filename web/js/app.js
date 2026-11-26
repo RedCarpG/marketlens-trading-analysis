@@ -430,6 +430,7 @@ function init() {
     pl: '情景的入场 / 止损 / 目标',
     tr: '我的开平仓、持仓与止损止盈',
     ev: '非农、CPI、FOMC 等高影响事件的公布时间',
+    ss: '亚洲、欧洲、美国时段的底色（15m、1h）',
   };
   $('#mks').innerHTML =
     '<div class="mh">图上标注</div>' +

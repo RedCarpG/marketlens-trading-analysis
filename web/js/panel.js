@@ -155,6 +155,7 @@ ${blk('sc', `价格行为情景 <span class="mu">${tf} · 纯K线</span>`, scn, 
 ${blk('lv', `关键价位 <span class="mu">${tf} 及更大</span>`, keys, chip('hl', '前高前低') + chip('sr', '支撑阻力'))}
 ${blk('sg', `近期信号 <span class="n">${sigs.length}</span>`, sgl, chip('ar', '图上'))}
 ${blk('kv', `关键数值 <span class="mu">${tf}</span>`, `<div class="row"><span>RSI(14)</span><b>${a.rsi.toFixed(1)}</b></div><div class="row"><span>ATR(14)</span><b>${f(a.a)}</b></div>${volBlock()}${a.hv ? '' : '<div class="row"><span>成交量</span><b class="mu">无（放量项不计分）</b></div>'}`)}
+${ssBlock()}
 <p class="disc">信号、评分与情景由规则自动生成，初步回测未发现可靠优势，仅作辅助参考，不构成投资建议。演示数据为随机模拟。</p>`;
 }
 /* 波动状态（分析页“关键数值”里，ATR 那一行下面）：当前周期的 ATR(14) 在过去一年里排在什么位置，一句事实 + 一条刻度 + 怎么比的。
@@ -169,6 +170,44 @@ function volBlock() {
   return `<div class="volst"><div class="vt">${volText(v, { T: tf, dp: cur.p })}</div>
 <div class="vbar" title="左边是最小，右边是最大"><i style="left:${((v.below / v.n) * 100).toFixed(1)}%"></i></div>
 <div class="mu sm">和它之前 ${v.n} 根已收盘K线（${fmt(tf, v.from)} 起）的 ATR(14) 比，其中 ${v.below} 根比它小。只说波动大小，不说方向。</div></div>`;
+}
+/* 交易时段（分析页最下面一块）：现在是哪个时段、各时段平常的波幅。时段按 UTC 划分（core/context.js 的 SESS）。
+   波幅用已加载的 1 小时K线算（没有时用 15 分钟）：每天每个时段里最高价减最低价，再取平均；旁边写它相当于几个日线 ATR。
+   看哪个周期这一块都在；图上的底色只在 15 分钟、1 小时周期画 */
+let ssMemo = { k: '', v: null };
+function ssBlock() {
+  const T = cur.src == 'csv' ? null : ['1h', '15m'].find(k => ALL[k] && ALL[k].length);
+  if (!T) return '';
+  const b = closed(T, ALL[T]),
+    k = [cur.sym, cur.src, T, b.length, b.length ? b[b.length - 1].timestamp : 0].join('|');
+  if (ssMemo.k !== k) ssMemo = { k, v: sessStats(b, T) };
+  const st = ssMemo.v,
+    f = v => v.toFixed(cur.p),
+    da = C['1d'] && C['1d'].a ? C['1d'].a.a : null,
+    now = Date.now(),
+    /* 本机时间的几点：按今天算（夏令时跟着变）；整点只写点数，差半小时的时区写出分钟 */
+    lh = h => {
+      const d = new Date(new Date(now).setUTCHours(h % 24, 0, 0, 0));
+      return d.getHours() + (d.getMinutes() ? ':' + String(d.getMinutes()).padStart(2, '0') : '');
+    },
+    cs = SESS.find(s => s.k == sessOf(now)),
+    rows = st.rows
+      .map(r => {
+        const s = SESS.find(q => q.k == r.k);
+        return `<div class="ssr${cs.k == r.k ? ' now' : ''}"><i class="d" style="background:${SESSC[r.k]}"></i><span class="sn"><b>${s.n}</b><small>UTC ${s.from}–${s.to} 点 · 本机 ${lh(s.from)}–${lh(s.to)} 点</small></span>${
+          r.n
+            ? `<span class="sv" title="${r.n} 天的平均"><b>${f(r.avg)}</b><small>${da ? (r.avg / da).toFixed(2) + ' 个日线 ATR' : r.n + ' 天'}</small></span>`
+            : '<span class="sv mu sm">没有够整段的K线</span>'
+        }</div>`;
+      })
+      .join('');
+  return blk(
+    'ss',
+    `交易时段 <span class="mu">平常的波幅</span>`,
+    `<div class="mu sm ssn">现在是${cs.n}（UTC ${new Date(now).toISOString().slice(11, 16)}）</div>${rows}
+<div class="note2">波幅 = 一个时段里最高价减最低价，对已加载的 ${TFN[T]}K线里的 ${st.days} 天（${fmt('1d', st.from)} 起）取平均，单位是价格${da ? `；旁边是它相当于几个日线 ATR（现在的日线 ATR ${f(da)}）` : ''}。还没走完的时段、K线不到一半的时段不算。${SESS_TFS.includes(tf) ? '' : `图上的底色只在 15 分钟、1 小时周期画，${tf} 周期不画。`}</div>`,
+    chip('ss', '图上')
+  );
 }
 /* 预警页：总开关、三类提醒（可单独勾选）、通知权限状态、最近 10 条预警 */
 function alPanel() {

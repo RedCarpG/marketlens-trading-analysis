@@ -15,7 +15,17 @@ const SHORT = {
   收盘跌破布林下轨: '破下轨',
 };
 const KEYSIG = new Set(['金叉', '死叉', '破上轨', '破下轨']); // 这几类总是标出；其余信号只在靠近关键价位时标出
-const MKN = { hl: '前高前低', sr: '支撑阻力', ar: '信号箭头', pl: '情景', tr: '我的交易', ev: '经济事件' };
+const MKN = {
+  hl: '前高前低',
+  sr: '支撑阻力',
+  ar: '信号箭头',
+  pl: '情景',
+  tr: '我的交易',
+  ev: '经济事件',
+  ss: '交易时段',
+};
+/* 交易时段底色的三种颜色（亚洲 / 欧洲 / 美国），面板里“交易时段”块的圆点也用；和涨跌色、交易的蓝橙都错开 */
+const SESSC = { asia: '#6f7ce8', eu: '#2fa8c2', us: '#d49a3a' };
 /* “标注”菜单里每个开关前的小图例，与图上画法一致 */
 const SW = {
   hl: '<path d="M5 5h17" style="stroke:var(--dn);stroke-dasharray:1.5 3;stroke-width:1.5"/><path d="M5 1l3 4-3 4-3-4z" style="fill:var(--dn)"/>',
@@ -24,6 +34,7 @@ const SW = {
   pl: '<rect x="1" width="21" height="5" style="fill:var(--up);opacity:.5"/><rect x="1" y="5" width="21" height="5" style="fill:var(--dn);opacity:.5"/><path d="M1 5h21" style="stroke:var(--ac);stroke-width:1.5"/>',
   tr: '<path d="M5 2l4 7H1z" style="fill:var(--tb)"/><path d="M8 6l9-3" style="stroke:var(--up);stroke-width:1.5"/><circle cx="18.5" cy="3" r="2.2" style="fill:none;stroke:var(--up);stroke-width:1.5"/>',
   ev: '<path d="M8 0v10" style="stroke:var(--mu);stroke-dasharray:1.5 2;stroke-width:1.2"/><rect x="2" y="5.5" width="12" height="4.5" rx="1.5" style="fill:none;stroke:var(--mu);stroke-width:1.1"/>',
+  ss: `<rect width="7" height="10" style="fill:${SESSC.asia};opacity:.45"/><rect x="7.5" width="6" height="10" style="fill:${SESSC.eu};opacity:.45"/><rect x="14" width="8" height="10" style="fill:${SESSC.us};opacity:.45"/>`,
 };
 /* 点击“近期信号”时自动打开的相关指标 */
 const SIGIND = {
@@ -54,6 +65,7 @@ const TXT = {
    我的交易  买=蓝色▲、卖=橙色▼（与涨跌色区分），开平仓之间按盈亏着色的实线，平仓空心圆 + 实心盈亏标签
    我的持仓  粗实线 + 实心标签；我的止损/止盈为虚线 + 空心标签
    经济事件  公布时间所在K线上的竖点线（弱化色）+ 底部空心小标签（非农、CPI、FOMC…）
+   交易时段  很淡的整列底色（亚洲 / 欧洲 / 美国各一种颜色），每段左上角一个小字；只在 15 分钟、1 小时周期画，默认关
    右侧所有价位标签统一由标签层绘制，自动上下错开，不再互相压住 */
 const TRC = [
     ['#2f6fd6', '#d9822b'],
@@ -289,6 +301,36 @@ function regOverlays() {
       ignoreEvent: true,
     });
     if (!barSpace || barSpace.gapBar >= (e.top ? 1 : 3)) label(x, 'center', e.text);
+    return fg;
+  });
+  /* 交易时段底色：整个图只有这一个图形，extendData.segs 是按“同一天同一时段”分好的K线下标范围（core/context.js 的 sessBands），
+     每次重画只算画面里看得到的那几段。每段从第一根的左边缘铺到最后一根的右边缘；够宽（≥30px）时在左上角写“亚洲 / 欧洲 / 美国”，
+     位置让开顶栏和主图图例（每开一个主图指标图例多一行） */
+  ov('fbSess', 2, ({ overlay, bounding, barSpace, xAxis }) => {
+    const e = overlay.extendData,
+      vr = chart.getVisibleRange(),
+      hb = barSpace.halfBar,
+      top = safeT() + 8 + 20 * MAIN.filter(n => on[n]).length,
+      fg = [];
+    for (const g of e.segs) {
+      if (g.b < vr.from - 1 || g.a > vr.to) continue;
+      const x1 = xAxis.convertToPixel(g.a) - hb,
+        x2 = xAxis.convertToPixel(g.b) + hb,
+        c = SESSC[g.k];
+      fg.push({
+        type: 'rect',
+        attrs: { x: x1, y: 0, width: x2 - x1, height: bounding.height },
+        styles: { style: 'fill', color: c + e.a },
+        ignoreEvent: true,
+      });
+      if (x2 - x1 >= 30)
+        fg.push({
+          type: 'text',
+          attrs: { x: x1 + 4, y: top, text: g.n, align: 'left', baseline: 'top' },
+          styles: { ...TXT, size: 11, color: c + 'dd' },
+          ignoreEvent: true,
+        });
+    }
     return fg;
   });
   /* 最新K线分界：最新一根K线右边缘画一条竖虚线，右侧（还没走出来的区域）铺一层淡淡的强调色，主图和各副图都画 */
@@ -598,6 +640,7 @@ let ovSig = '',
   lastM = null;
 function drawMarks(m) {
   lastM = m;
+  sessMark();
   const f = v => v.toFixed(cur.p),
     items = [],
     labs = [],
@@ -800,4 +843,27 @@ function nowMark() {
       pid
     )
   );
+}
+/* 交易时段底色（“标注”菜单的“交易时段”，默认关）：只在 15 分钟、1 小时周期画（见 core/context.js 的 SESS_TFS）。
+   单独一组图形，放在最底层；K线多了一根、换了品种周期或主题才重建，平移缩放时由 fbSess 自己按画面重算 */
+let ssSig = '';
+function sessMark() {
+  const show = MK.ss && bars.length && cur.src != 'csv' && SESS_TFS.includes(tf),
+    last = bars[bars.length - 1],
+    sig = show ? [cur.sym, cur.src, tf, bars.length, bars[0].timestamp, last.timestamp, theme].join('|') : '';
+  if (sig === ssSig) return;
+  ssSig = sig;
+  chart.removeOverlay({ groupId: 'ss' });
+  if (!show) return;
+  chart.createOverlay({
+    name: 'fbSess',
+    groupId: 'ss',
+    lock: true,
+    zLevel: -2,
+    points: [{ timestamp: last.timestamp, value: last.close }],
+    extendData: {
+      a: DARK[theme] ? '18' : '16',
+      segs: sessBands(bars).map(g => ({ ...g, n: SESS.find(s => s.k == g.k).s })),
+    },
+  });
 }

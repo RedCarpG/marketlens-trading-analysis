@@ -54,8 +54,7 @@ function reviewTrade(t, all) {
       hi = Math.max(hi, k.high);
     }
   const path = hi > -Infinity,
-    od = new Date(t.openTs),
-    uh = od.getUTCHours();
+    od = new Date(t.openTs);
   return {
     t,
     dir,
@@ -78,13 +77,13 @@ function reviewTrade(t, all) {
     win: closed && t.netProfit != null ? t.netProfit > 0 : null,
     mae: path ? Math.max(0, dir > 0 ? p - lo : hi - p) / x : null,
     mfe: path ? Math.max(0, dir > 0 ? hi - p : p - lo) / x : null,
-    /* 开仓在星期几、哪个时段（按 UTC：亚洲 0–7 点、欧洲 7–13 点、美国 13–21 点、其余算收盘后） */
+    /* 开仓在星期几、哪个时段（按 UTC：亚洲 0–7 点、欧洲 7–13 点、美国 13–21 点、其余算收盘后；划分在 core/context.js 的 SESS） */
     dow: od.getUTCDay(),
-    sess: uh < 7 ? 'asia' : uh < 13 ? 'eu' : uh < 21 ? 'us' : 'late',
+    sess: sessOf(t.openTs),
   };
 }
 const RV_DOW = { 1: '周一', 2: '周二', 3: '周三', 4: '周四', 5: '周五', 6: '周六', 0: '周日' };
-const RV_SESS = { asia: '亚洲时段', eu: '欧洲时段', us: '美国时段', late: '美国收盘后' };
+const RV_SESS = Object.fromEntries(SESS.map(s => [s.k, s.n]));
 
 /* 汇总：只统计已平仓且复盘成功的交易；按顺逆势、入场位置、止损、是否有同向情景分组，并给出几条最值得注意的结论 */
 /* cs：洞察文字里金额前的币种符号（可省略） */
