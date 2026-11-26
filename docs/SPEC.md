@@ -431,4 +431,4 @@ web/
 - **包里没有网络请求**：K线由调用方自己取。取数搬进包是路线图第 4 步的事。
 - 模块里是严格模式，和页面的普通脚本略有不同，所以 `tests/corepkg.test.js` 把包打到临时目录，用两份（import、require）和源码各算一遍分析、摘要、预警、分析包，逐字段比较；同时核对导出的名字、类型文件、页面加载的脚本都在清单里、正式代码不引用 `tests/`。
 - 验证（2026-11-26）：测试 76 项通过；用后台代理的真实 eToro GOLD K线跑了打出来的包，1 小时和日线都说得出摘要，日线的最近支撑（3499.49）和阻力（3886.15）与页面图上标的一致；把 tgz 装进一个空项目，`require('marketlens-core')` 和 `import` 都能用。
-- 发版：tgz 挂到 GitHub Release（标签 `core-v<版本>`），做法见 `core/README.md`。0.1.0 已在本机打出，还没有发到 Release。
+- 发版：tgz 挂到 GitHub Release（标签 `core-v<版本>`），做法见 `core/README.md`。0.1.0 于 2026-11-26 发出（`core-v0.1.0`），Cirra 插件“MarketLens 行情”1.1.0 从那里装。
