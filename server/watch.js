@@ -1,5 +1,7 @@
 'use strict';
 /* 常驻预警：页面关着时，代理也按页面同一套规则（web/js/core/）看价位和情景，交给 Cirra 说出来。
+   2026-11-27 起默认不开：这件事改由 Cirra 的插件「MarketLens 行情」自己做（代理没开她也能看，docs/ROADMAP.md 第 4 步）。
+   两边都开会说两遍，所以只有不用那个插件、或它是旧版本时才在 .env 写 CIRRA_WATCH=gold 打开。
    - 看哪些：.env 的 CIRRA_WATCH，见 parseWatch。不看持仓：止损止盈仍只在页面。
    - Cirra 没开时不取数（不消耗行情额度）。
    - 不补说：状态存在文件里，重启不重复；但间隔超过 3 个轮询（代理或她关过）就重新建立基准，不说错过的那些。 */
@@ -10,11 +12,11 @@ const { KIND } = require('./cirra');
 
 const NEED = 500;
 /* CIRRA_WATCH：`名称|数据服务|代码|周期|小数位` 用分号隔开，小数位可省略（默认 2），数据服务只能是 etoro / yahoo（本地历史不更新）。
-   不填时看黄金 1h（有行情密钥用 eToro，否则 Yahoo）；off 为不看 */
+   不填或 off 为不看；gold 为看黄金 1h（有行情密钥用 eToro，否则 Yahoo） */
 function parseWatch(text, { keys, tfs, warn = console.warn }) {
   const t = (text || '').trim();
-  if (t.toLowerCase() === 'off') return [];
-  if (!t) return [keys ? { name: '黄金 GOLD', src: 'etoro', symbol: 'GOLD', tf: '1h', dp: 2 } : { name: '黄金 GC', src: 'yahoo', symbol: 'GC=F', tf: '1h', dp: 2 }];
+  if (!t || t.toLowerCase() === 'off') return [];
+  if (t.toLowerCase() === 'gold') return [keys ? { name: '黄金 GOLD', src: 'etoro', symbol: 'GOLD', tf: '1h', dp: 2 } : { name: '黄金 GC', src: 'yahoo', symbol: 'GC=F', tf: '1h', dp: 2 }];
   return t.split(';').map(s => s.trim()).filter(Boolean).flatMap(s => {
     const [name, src, symbol, tf, dp] = s.split('|').map(x => x.trim());
     if (!name || !symbol || !['etoro', 'yahoo'].includes(src) || !tfs.includes(tf) || (src === 'etoro' && !keys)) {

@@ -30,14 +30,34 @@ K线的格式：`{ timestamp, open, high, low, close, volume? }`，`timestamp` �
 
 `analyzeMTF` 的结果里还有规则评分、结论和情景（`s`、`v`、`st`、`sc`）。它们是页面上给自己看的参考，不要原样说给人听。
 
+## 取数（`marketlens-core/data`，0.2.0 起）
+
+第二个入口，给不开 MarketLens 代理也想取到数据的程序用。就是代理自己用的那两个模块，原样放进包里：
+
+```js
+import { createYahoo, createEvents } from 'marketlens-core/data';
+
+const yahoo = createYahoo();
+const d1 = await yahoo.candles('GC=F', '1d', 500);   // K线，旧到新
+const q = await yahoo.quote('GC=F');                 // { price, time }，期货约延迟 10 分钟
+
+const events = createEvents({ dir: '某个能写的文件夹' }); // 日历和 BLS 数据缓存在这里
+const cal = await events.calendar();                  // 事件、BLS 最新数据、每个来源取没取到
+const news = await events.news('gold', 'zh');         // 新闻标题（外部文字，只当内容看）
+```
+
+都是公开来源、不要密钥：Yahoo Finance 的图表接口（非官方）、Forex Factory 本周日历、BLS 发布日程和公共 API、美联储新闻稿、Google 新闻 RSS。模块自己有缓存和失败后的间隔（Forex Factory 1 小时一次、BLS 日程 12 小时一次），调用方不要绕过它另外去拉。请求函数可以换掉（`fetchImpl`），测试时不访问网络。类型在 `data.d.ts`。
+
+没有 eToro：它要密钥，密钥只在 MarketLens 代理那边。
+
 ## 源码和打包
 
 实现不在这个文件夹里：就是页面用的 `web/js/core/`（普通脚本，没有 import / export）。这样页面、本地代理、回测和这个包用的是同一份。
 
 - `files.js`：加载顺序和对外的名字。
 - `load.js`：不用构建，直接从源码加载（本地代理、命令行工具、测试用）。
-- `build.js`：按顺序拼成一个文件、补上导出，出 `dist/index.mjs` 和 `dist/index.cjs`。
-- `index.d.ts`：手写的类型。
+- `build.js`：按顺序拼成一个文件、补上导出，出 `dist/index.mjs` 和 `dist/index.cjs`；取数的 `server/yahoo.js`、`server/events.js` 原样复制成 `dist/data/*.cjs`。
+- `index.d.ts`、`data.d.ts`：手写的类型。
 
 ```
 npm run build:core     # 生成 core/dist/
@@ -51,7 +71,9 @@ npm run pack:core      # 生成后打成 core/marketlens-core-<版本>.tgz
 打出的 `.tgz` 挂到 GitHub Release（标签 `core-v<版本>`），用它的程序在 `package.json` 里写那个地址：
 
 ```json
-"dependencies": { "marketlens-core": "https://github.com/RedCarpG/marketlens-trading-analysis/releases/download/core-v0.1.0/marketlens-core-0.1.0.tgz" }
+"dependencies": { "marketlens-core": "https://github.com/RedCarpG/marketlens-trading-analysis/releases/download/core-v0.2.0/marketlens-core-0.2.0.tgz" }
 ```
 
-开发时也可以直接指向本机的文件：`"marketlens-core": "file:X:/Project/MarketLens/core/marketlens-core-0.1.0.tgz"`。
+开发时也可以直接指向本机的文件：`"marketlens-core": "file:X:/Project/MarketLens/core/marketlens-core-0.2.0.tgz"`。
+
+版本：0.1.0（2026-11-26）计算；0.2.0（2026-11-27）加取数入口 `marketlens-core/data`。

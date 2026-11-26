@@ -42,13 +42,14 @@ function parse(j, iv) {
   };
 }
 
-function createYahoo({ base = 'https://query1.finance.yahoo.com' } = {}) {
+/* fetchImpl：可以换掉的请求函数（测试、别的程序里用）；不给就用全局的 fetch */
+function createYahoo({ base = 'https://query1.finance.yahoo.com', fetchImpl = fetch } = {}) {
   const cache = new Map();
   async function chart(sym, iv, span) {
     const k = sym + '|' + iv + '|' + span, c = cache.get(k), ttl = TTL[iv] || 10e3;
     if (c && Date.now() - c.at < ttl) return c.p;
     const p = (async () => {
-      const r = await fetch(`${base}/v8/finance/chart/${encodeURIComponent(sym)}?interval=${iv}&${span}${span.startsWith('period1') ? `&period2=${Math.floor(Date.now() / 1000)}` : ''}`, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+      const r = await fetchImpl(`${base}/v8/finance/chart/${encodeURIComponent(sym)}?interval=${iv}&${span}${span.startsWith('period1') ? `&period2=${Math.floor(Date.now() / 1000)}` : ''}`, { headers: { 'User-Agent': 'Mozilla/5.0' } });
       if (!r.ok) { const e = new Error(`Yahoo 返回 ${r.status}`); e.status = r.status === 404 ? 404 : r.status === 429 ? 429 : 502; throw e; }
       return parse(await r.json(), iv);
     })();

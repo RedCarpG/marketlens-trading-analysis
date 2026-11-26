@@ -53,9 +53,10 @@ function keyLevel() {
   return m.L.filter(l => get('isKey')(l, '1h'))[0].p;
 }
 
-test('parseWatch：不填看黄金，off 不看，错的条目跳过', () => {
-  assert.equal(parseWatch('', { keys: true, tfs: TFS })[0].src, 'etoro');
-  assert.equal(parseWatch(undefined, { keys: false, tfs: TFS })[0].symbol, 'GC=F');
+test('parseWatch：不填、off 都不看（默认交给 Cirra 的插件）；gold 看黄金；错的条目跳过', () => {
+  assert.equal(parseWatch('gold', { keys: true, tfs: TFS })[0].src, 'etoro');
+  assert.equal(parseWatch(' GOLD ', { keys: false, tfs: TFS })[0].symbol, 'GC=F');
+  assert.deepEqual([parseWatch('', { keys: true, tfs: TFS }), parseWatch(undefined, { keys: false, tfs: TFS })], [[], []]);
   assert.deepEqual(parseWatch('off', { keys: true, tfs: TFS }), []);
   const warn = [];
   const r = parseWatch('比特币|yahoo|BTC-USD|4h|1;坏的|binance|X|1h;金|etoro|GOLD|1h', {

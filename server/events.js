@@ -301,7 +301,7 @@ function jsonFile(f) {
 /* 返回的日历：最近 8 天及以后的全部事件；更早的只留高影响（供图上标注），最多回看 400 天 */
 const KEEP = 400 * 864e5, RECENT = 8 * 864e5;
 
-function createEvents({ dir, ua = 'MarketLens/0.4 (personal market dashboard)', blsKey = '', feeds = [], fetchImpl = fetch, now = () => Date.now(), urls = {} }) {
+function createEvents({ dir, ua = 'MarketLens/0.4 (personal market dashboard)', blsKey = '', feeds = [], fetchImpl = fetch, now = () => Date.now(), urls = {}, warn = console.warn }) {
   const U = { ff: FF_URL, ics: BLS_ICS, bls: blsKey ? BLS_V2 : BLS_V1, fed: FED_RSS, gnews, ...urls };
   const calF = jsonFile(path.join(dir, 'calendar.json')), blsF = jsonFile(path.join(dir, 'bls.json'));
   const cal = calF.load({ events: [], meta: {} });
@@ -345,7 +345,7 @@ function createEvents({ dir, ua = 'MarketLens/0.4 (personal market dashboard)', 
       calF.save(cal);
     } catch (e) {
       s.err = e.message;
-      console.warn(`[events] ${s.name}：${e.message}`);
+      warn(`[events] ${s.name}：${e.message}`);
     }
   }
   const refreshFF = async () => {
@@ -375,7 +375,7 @@ function createEvents({ dir, ua = 'MarketLens/0.4 (personal market dashboard)', 
     } catch (e) {
       st.bls.err = e.message;
       bls = { ...bls, at: bls.at || 0, err: e.message };
-      console.warn(`[events] BLS 官方数据：${e.message}`);
+      warn(`[events] BLS 官方数据：${e.message}`);
     }
     blsF.save({ ...bls, at: bls.at || 0 });
   }

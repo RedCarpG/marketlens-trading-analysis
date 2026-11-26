@@ -8,7 +8,7 @@ const path = require('path');
 const { pathToFileURL } = require('url');
 const { loadCore } = require('../core/load');
 const { build } = require('../core/build');
-const { FILES, API, VERSION, SRC } = require('../core/files');
+const { FILES, API, VERSION, SRC, DATA_SRC, DATA_FILES, DATA_API } = require('../core/files');
 
 const ROOT = path.join(__dirname, '..');
 const plain = v => JSON.parse(JSON.stringify(v));
@@ -102,9 +102,56 @@ test('清单、类型文件、页面、发布内容对得上', () => {
     assert.match(dts, new RegExp(`export (declare )?(function|const) ${k}\\b`), `index.d.ts 里没有 ${k}`);
   /* 发布的只有打出来的文件、类型和说明；入口指向存在的文件名 */
   const pkg = require('../core/package.json');
-  assert.deepEqual(pkg.files, ['dist', 'index.d.ts', 'README.md']);
+  assert.deepEqual(pkg.files, ['dist', 'index.d.ts', 'data.d.ts', 'README.md']);
   assert.deepEqual(pkg.exports['.'], { types: './index.d.ts', import: './dist/index.mjs', require: './dist/index.cjs' });
+  assert.deepEqual(pkg.exports['./data'], { types: './data.d.ts', default: './dist/data/index.cjs' });
   assert.ok(fs.existsSync(path.join(ROOT, 'core', 'README.md')));
+  /* 取数入口对外的每个名字在 data.d.ts 里都有声明 */
+  const ddts = fs.readFileSync(path.join(ROOT, 'core', 'data.d.ts'), 'utf8');
+  for (const k of [...Object.values(DATA_API).flat(), 'VERSION'])
+    assert.match(ddts, new RegExp(`export (declare )?(function|const) ${k}\\b`), `data.d.ts 里没有 ${k}`);
+});
+
+test('取数入口（marketlens-core/data）：打出来能用，import 也认得出名字；请求函数换成假的，不访问网络', async () => {
+  const { dir } = await built();
+  try {
+    const data = require(path.join(dir, 'data', 'index.cjs')),
+      viaImport = await import(pathToFileURL(path.join(dir, 'data', 'index.cjs')).href),
+      names = [...Object.values(DATA_API).flat(), 'VERSION'].sort();
+    assert.deepEqual(Object.keys(data).sort(), names);
+    for (const k of names) assert.notEqual(viaImport[k], undefined, `import 认不出 ${k}`);
+    assert.equal(data.VERSION, VERSION);
+    /* Yahoo：照它的图表接口回两根日线 */
+    const asked = [],
+      day = Date.UTC(2026, 9, 1) / 1000,
+      yahoo = data.createYahoo({
+        fetchImpl: async url => {
+          asked.push(String(url));
+          return new Response(JSON.stringify({ chart: { result: [{ meta: { regularMarketPrice: 102, regularMarketTime: day }, timestamp: [day, day + 86400], indicators: { quote: [{ open: [100, 101], high: [103, 104], low: [99, 100], close: [101, 102], volume: [5, 6] }] } }] } }));
+        },
+      }),
+      bars = await yahoo.candles('GC=F', '1d', 500);
+    assert.deepEqual(bars.map(b => b.close), [101, 102]);
+    assert.match(asked[0], /^https:\/\/query1\.finance\.yahoo\.com\/v8\/finance\/chart\/GC%3DF\?interval=1d&period1=/);
+    assert.deepEqual(await yahoo.quote('GC=F'), { price: 102, time: day * 1000 });
+    /* 日历：所有来源都取不到时不抛错，内置的 FOMC 日程还在，来源状态里写着没取到；提示走 warn，不直接写控制台 */
+    const warned = [],
+      events = data.createEvents({ dir: path.join(dir, 'ev'), fetchImpl: async () => { throw new Error('离线'); }, warn: m => warned.push(m) }),
+      cal = await events.calendar();
+    assert.ok(cal.events.some(e => e.src == 'fed' && e.rel == 'fomc'));
+    assert.deepEqual(cal.sources.filter(s => !s.ok).map(s => s.name).sort(), ['BLS 发布日程', 'BLS 官方数据', 'Forex Factory 本周日历']);
+    assert.ok(warned.length >= 2 && warned.every(m => /离线/.test(m)));
+    assert.deepEqual((await events.news('gold', 'zh')).items, []);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('取数的模块只用 Node 自带的 fs / path（打进包里不带别的依赖）', () => {
+  const { dataFiles } = require('../core/build');
+  const files = dataFiles();
+  assert.deepEqual(Object.keys(files).sort(), ['data/events.cjs', 'data/index.cjs', 'data/yahoo.cjs']);
+  for (const f of DATA_FILES) assert.ok(fs.existsSync(path.join(DATA_SRC, f + '.js')));
 });
 
 test('正式代码不引用 tests/ 目录', () => {

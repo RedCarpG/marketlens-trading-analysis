@@ -76,7 +76,11 @@ Cirra 插件 1.1.0（2026-11-26，路线图第 2 步，在 X:\Project\Cirra\cirr
 
 第 3 步后半（2026-11-26，A3、A5）：core/review.js 加 whatIf（同一批真实入场换三种出场，用回测的 btSim，按 R 比实际），core/rules.js 加 weekly（最近几周一周一行，带“这一周最该记住的”）；复盘面板多两张表。测试 tests/whatif.test.js，共 96 项通过；浏览器里用模拟品种看过。第 3 步的改动都还没提交。
 
-下一步：用户在 Cirra 里重新加载并打开插件、验收；在交易页定自己的守则，用真实交易看复盘面板；然后是路线图第 4 步（插件自己取数）。见 docs/ROADMAP.md §5。情景入场条件仍无优势，不再细调；GC数据（eToro Micro Gold期货拼接连续合约或另找GC源）以后再议。
+第 3 步已提交并推送（4cae25f，2026-11-27）。
+
+第 4 步（2026-11-27）：marketlens-core 0.2.0 加取数入口 marketlens-core/data（core/build.js 把 server/yahoo.js、server/events.js 原样复制进包，core/data.d.ts 是类型；createYahoo 的请求函数、createEvents 的提示函数可以换掉）。代理的常驻预警 server/watch.js 改成默认不开（CIRRA_WATCH=gold 再打开）。Cirra 插件 1.2.0（cirra-plugins）：sources.ts（先问代理、连不上自己取）、levelwatch.ts（自己每 5 分钟看黄金 1 小时图的价位）、页面转来的同类不说两遍、设置里两项、联网权限多了几个公开来源。本仓库测试 98 项、插件测试 51 项通过；停掉代理和开着代理各实际跑了一遍编好的插件。
+
+下一步：用户在 Cirra 里更新并打开插件、验收（第 2、4 步）；在交易页定自己的守则，用真实交易看复盘面板（第 3 步）；然后是路线图第 5 步（情境）。见 docs/ROADMAP.md §5。情景入场条件仍无优势，不再细调；GC数据（eToro Micro Gold期货拼接连续合约或另找GC源）以后再议。
 
 已定（2026-10-22）：先用eToro GOLD（黄金CFD），GC期货数据源以后再议。
 待定：Binance适配器是否需要验证；v0.3中未写入项目说明的内容（手动ChatGPT分析包、SQLite留痕）是否还要。（经济日历与新闻的真实联调已于 2026-11-26 通过；DATA_VALIDATION.md 已归档。）GitHub：当前仓库 https://github.com/RedCarpG/marketlens-trading-analysis（公开；2026-10-24 由 web-trading-MarketLens-app 改名；命名：全小写连字符，品牌名 + 用途；main），.env、server/node_modules、work/ 均未上传。

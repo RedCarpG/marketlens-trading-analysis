@@ -1,7 +1,7 @@
 {
   "name": "marketlens-core",
-  "version": "0.1.0",
-  "description": "MarketLens's reckoning for other programs: multi-timeframe state, key levels, alert rules and plain-text summaries for AI. Read-only facts, no trading advice.",
+  "version": "0.2.0",
+  "description": "MarketLens's reckoning for other programs: multi-timeframe state, key levels, alert rules and plain-text summaries for AI, plus the public-data fetchers (Yahoo candles, economic calendar, news). Read-only facts, no trading advice.",
   "license": "UNLICENSED",
   "author": "RedCarpG",
   "repository": {
@@ -17,11 +17,16 @@
       "types": "./index.d.ts",
       "import": "./dist/index.mjs",
       "require": "./dist/index.cjs"
+    },
+    "./data": {
+      "types": "./data.d.ts",
+      "default": "./dist/data/index.cjs"
     }
   },
   "files": [
     "dist",
     "index.d.ts",
+    "data.d.ts",
     "README.md"
   ],
   "engines": {
