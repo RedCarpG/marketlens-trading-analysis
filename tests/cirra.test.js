@@ -208,8 +208,9 @@ test('代理 /api/cirra/notify：只收本机页面的 JSON；表情按 kind 定
       JSON.stringify({ text: '离你的止损只差 0.4 个 ATR', kind: 'dn', emotion: 'happy' })
     );
     assert.deepEqual([ok.status, ok.json], [200, { ok: true }]);
-    assert.deepEqual(c.got[0].body, { text: '离你的止损只差 0.4 个 ATR', emotion: 'worried' });
-    assert.deepEqual((await req(port, 'GET', '/api/cirra/status')).json, { running: true, file });
+    assert.deepEqual(c.got[0].body, { text: '离你的止损只差 0.4 个 ATR', emotion: 'worried', source: 'market', kind: 'dn' });
+    const st = (await req(port, 'GET', '/api/cirra/status')).json;
+    assert.deepEqual([st.running, st.file, Array.isArray(st.watch)], [true, file, true]);
     assert.equal((await req(port, 'POST', '/api/candles', { headers: { ...J, origin: O }, body: '{}' })).status, 405);
     /* 她关了：仍回 200，ok 为假 */
     fs.rmSync(file);

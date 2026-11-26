@@ -8,8 +8,6 @@ let CI = { on: 1, lv: 0, sc: 0, sl: 1, ev: 1, ...LS.get('cirra', {}) },
   CL = null;
 /* 交给代理的类型（决定她的表情）→ 属于哪个勾选 */
 const CIG = { lv: 'lv', sc: 'sc', scx: 'sc', dn: 'sl', up: 'sl', ev: 'ev' };
-/* 周期念出来的说法 */
-const TFN = { '15m': '15 分钟', '1h': '1 小时', '4h': '4 小时', '1d': '日线', '1w': '周线', '1M': '月线' };
 /* 品种念出来的名字：自选列表里“ · ”前面那段（如“黄金 GOLD”） */
 const ciName = () => cur.name.split(' · ')[0];
 async function ciPost(text, kind) {
@@ -25,12 +23,18 @@ async function ciPost(text, kind) {
     CL = { t: Date.now(), ok: false, reason: '代理没回话' };
   }
   if (!CL.ok && /没开/.test(CL.reason)) CS = { running: false, reason: CL.reason };
-  else if (CL.ok) CS = { running: true };
+  else if (CL.ok) CS = { ...CS, running: true };
   ciRedraw();
 }
+/* 当前品种和周期的价位、情景由代理的常驻预警负责时（server/watch.js），页面不再转发，免得说两遍 */
+const ciByProxy = kind =>
+  CIG[kind] != 'sl' &&
+  CIG[kind] != 'ev' &&
+  !!(CS && CS.watch) &&
+  CS.watch.some(w => w.src == cur.src && w.symbol == ssym(cur) && w.tf == tf);
 /* alFire 调用：kind 为上面 CIG 里的类型 */
 function cirraSay(text, kind) {
-  if (!LOCAL || !CI.on || !CI[CIG[kind]]) return;
+  if (!LOCAL || !CI.on || !CI[CIG[kind]] || ciByProxy(kind)) return;
   ciPost(text, kind);
 }
 /* 状态每 30 秒查一次（只读：对她的端口发 GET，不会让她说话） */
@@ -64,7 +68,7 @@ function ciPanel() {
 <button class="chip" id="cit" title="让 Cirra 说一句“MarketLens 连上了”">试一下</button>
 <button class="swb${CI.on ? ' on' : ''}" data-ci-on role="switch" aria-checked="${!!CI.on}" title="${CI.on ? '不让 Cirra 播报' : '让 Cirra 播报'}"></button></div>
 <div class="opts${CI.on ? '' : ' off'}">${opt('ev', '经济事件', '公布前 30 / 5 分钟、BLS 公布新数')}${opt('sl', '我的止损 / 止盈', '价格接近时')}${opt('lv', '关键价位', '较频繁，默认不播')}${opt('sc', '情景触发 / 失效', '默认不播')}</div>
-<div class="note2">预警开着时，勾选的几类除了弹窗也交给桌宠 Cirra 说出来（经本地代理转发，她没开时跳过）。她那边的免打扰、专注时段照常生效。</div>`;
+<div class="note2">预警开着时，勾选的几类除了弹窗也交给桌宠 Cirra 说出来（经本地代理转发，她没开时跳过）。她那边的免打扰、专注时段照常生效。${CS && CS.watch && CS.watch.length ? `<br>代理在后台看 ${CS.watch.map(w => esc(w.name) + ' ' + TFN[w.tf]).join('、')} 的价位和情景，页面关着也会说，不受上面两个勾选影响；页面在同一品种和周期上不再重复转发。` : ''}</div>`;
 }
 function setCiOn(v) {
   CI.on = v ? 1 : 0;

@@ -20,6 +20,7 @@ const { createStore } = require('./store');
 const { createYahoo } = require('./yahoo');
 const { createEvents, parseFeeds, TOPIC, LANGS } = require('./events');
 const { createCirra, KIND } = require('./cirra');
+const { createWatch, parseWatch } = require('./watch');
 
 const ROOT = path.resolve(__dirname, '..');
 function loadEnv(f) {
@@ -104,6 +105,14 @@ const trader = createTrader({ apiKey: E.ETORO_TRADE_API_KEY, userKey: E.ETORO_TR
 const events = createEvents({ dir: E.EVENTS_DIR || path.join(ROOT, 'var', 'events'), ua: E.EVENTS_UA || undefined, blsKey: E.BLS_API_KEY || '', feeds: parseFeeds(E.NEWS_FEEDS) });
 /* 桌宠 Cirra：读她写的 endpoint 文件，把预警转给她的 /notify */
 const cirra = createCirra(E.CIRRA_ENDPOINT_FILE ? { file: E.CIRRA_ENDPOINT_FILE } : {});
+/* 常驻预警：页面关着时也看价位和情景，交给 Cirra（见 watch.js） */
+const watch = createWatch({
+  list: parseWatch(E.CIRRA_WATCH, { keys: KEYS, tfs: TFS }),
+  candles: (src, s, tf, n) => SRCS[src].candles(s, tf, n),
+  cirra,
+  file: E.CIRRA_WATCH_FILE || path.join(ROOT, 'var', 'watch.json'),
+  pollMs: Math.max(1, +E.CIRRA_WATCH_POLL_MIN || 5) * 60e3,
+});
 
 /* 页面文件：只托管 web/ 目录下的 html/css/js；路径规范化后必须仍在 web/ 内，防止 ../ 穿越读到 .env 等 */
 const WEB = path.join(ROOT, 'web');
@@ -161,7 +170,7 @@ const server = http.createServer(async (req, res) => {
   if (u.pathname === '/api/health') return json(res, 200, { ok: true, keys: KEYS, trade: TKEYS, price: PRICE, events: true });
   /* 桌宠 Cirra。POST 必须带本机页面的 Origin、Content-Type 为 JSON（外站网页发不了：不回 CORS 头，预检过不去）、请求体 ≤ 4 KB；
      kind 只认预设的几种，表情按 kind 定，不收页面传来的表情。她没开时也回 200（ok: false），页面只显示状态 */
-  if (u.pathname === '/api/cirra/status') return json(res, 200, { ...(await cirra.status()), file: cirra.file });
+  if (u.pathname === '/api/cirra/status') return json(res, 200, { ...(await cirra.status()), file: cirra.file, watch: watch.list() });
   if (isPost) {
     if (!req.headers.origin || !ORIGINS.has(req.headers.origin)) return json(res, 403, { error: 'forbidden' });
     if (!/^application\/json\b/i.test(req.headers['content-type'] || '')) return json(res, 415, { error: '只收 application/json' });
@@ -170,7 +179,7 @@ const server = http.createServer(async (req, res) => {
     let b;
     try { b = JSON.parse(raw); } catch { return json(res, 400, { error: '不是合法的 JSON' }); }
     if (!b || typeof b.text != 'string' || !b.text.trim() || !Object.hasOwn(KIND, b.kind)) return json(res, 400, { error: `须有 text，kind 须为 ${Object.keys(KIND).join('/')}` });
-    const r = await cirra.send({ text: b.text, emotion: KIND[b.kind] });
+    const r = await cirra.send({ text: b.text, emotion: KIND[b.kind], source: 'market', kind: b.kind });
     if (!r.ok && r.reason !== 'Cirra 没开') console.warn(`[cirra] ${r.reason}`);
     return json(res, 200, r);
   }
@@ -270,11 +279,20 @@ wss.on('connection', async (ws, req) => {
   }
 });
 
+/* 端口被占用多半是代理已经在跑（比如开机自启的那个）：说清楚再退出，不打一屏堆栈 */
+const onListenError = e => {
+  if (e.code !== 'EADDRINUSE') throw e;
+  console.error(`端口 ${PORT} 已被占用：MarketLens 代理可能已经在运行（http://${HOST}:${PORT}/）。开机自启的那个用 tools\\autostart.ps1 stop 停掉。`);
+  process.exit(1);
+};
+server.on('error', onListenError);
+wss.on('error', onListenError); // ws 把 server 的 error 转发到 wss 上，没人接会直接抛出
 server.listen(PORT, HOST, () => {
   console.log(`MarketLens 已启动：http://${HOST}:${PORT}/`);
   if (!KEYS) console.warn('未配置 ETORO_API_KEY / ETORO_USER_KEY：页面可用（模拟、CSV、Binance、Yahoo、本地历史），eToro 数据服务不可用');
   if (!TKEYS) console.warn('未配置 ETORO_TRADE_API_KEY / ETORO_TRADE_USER_KEY：不显示个人交易记录');
   const st = store.list();
+  watch.start();
   console.log(`本地K线存储：${st.length ? st.map(s => `${s.instrumentId}/${s.interval} ${s.count}根`).join('，') : '暂无（打开页面后开始积累）'}`);
 });
 

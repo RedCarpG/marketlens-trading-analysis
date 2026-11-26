@@ -27,14 +27,7 @@ let AL = { on: 0, lv: 1, sc: 1, sl: 1, ev: 1, ...LS.get('alerts', {}) },
   alSc = null,
   alKey = '';
 function alArmCheck(k, near, far, msg, kind, say) {
-  if (!(k in alArm)) {
-    alArm[k] = !near;
-    return;
-  }
-  if (alArm[k] && near) {
-    alArm[k] = false;
-    alFire(msg, kind, say);
-  } else if (!alArm[k] && far) alArm[k] = true;
+  if (armStep(alArm, k, near, far)) alFire(msg, kind, say);
 }
 function evalAlerts(m) {
   if (!AL.on || !m || cur.src == 'csv' || !bars.length) return;
@@ -47,48 +40,13 @@ function evalAlerts(m) {
     alArm = {};
     alSc = null;
   }
-  /* 关键价位：所有关键价位（isKey，不只图上画的每侧 3 条——价格移动后显示的那几条会变，只看它们会漏掉“重新布防”）
-   进入 ±0.15 ATR 提醒，离开 0.5 ATR 后重新布防 */
-  if (AL.lv) {
-    m.L.filter(l => isKey(l, tf)).forEach(l => {
-      const d = Math.abs(now - l.p);
-      alArmCheck(
-        'lv|' + l.p.toFixed(cur.p),
-        d <= x * 0.15,
-        d >= x * 0.5,
-        `${cur.sym} ${tf} 价格 ${f(now)} 到达${l.p < now ? '支撑' : '阻力'} ${f(l.p)}（${l.tfs.join('·')}${l.touch >= 3 ? ` · 挡回${l.touch}次` : ''}）`,
-        'lv',
-        `${ciName()} 到了${l.p < now ? '支撑' : '阻力'} ${f(l.p)} 附近`
-      );
-    });
-  }
-  /* 情景：新出现的“已触发”，以及已触发 → 失效/已到目标/被反向触发取代 */
-  if (AL.sc) {
-    const cur2 = {};
-    m.sc
-      .flatMap(c => c.trigs)
-      .forEach(g => {
-        const k = g.kind + '|' + g.dir + '|' + g.ts;
-        cur2[k] = g.state;
-        if (!alSc) return;
-        const p = alSc[k],
-          dn = g.kind + (g.dir > 0 ? '做多' : '做空');
-        if (!p && g.state == '已触发')
-          alFire(
-            `${cur.sym} ${tf} 情景触发：${dn}，入场 ${f(g.entry)} / 止损 ${f(g.stop)} / 目标 ${f(g.tgt)}（1:${g.rr.toFixed(1)}）`,
-            'sc',
-            `${ciName()} ${TFN[tf]}出现${dn}，入场 ${f(g.entry)}，止损 ${f(g.stop)}`
-          );
-        else if (p == '已触发' && g.state != '已触发')
-          alFire(
-            `${cur.sym} ${tf} 情景${g.state}：${dn}（入场 ${f(g.entry)}）`,
-            'sc',
-            `${ciName()} ${TFN[tf]}那个${dn}${g.state.replace(/（.*?）/g, '')}了`,
-            'scx'
-          );
-      });
-    alSc = cur2;
-  }
+  /* 关键价位和情景：判定和句子与代理的常驻预警共用（core/alertrules.js） */
+  const st = { arm: alArm, sc: alSc };
+  alCheck(m, tf, now, st, { lv: AL.lv, sc: AL.sc, dp: cur.p }).forEach(h => {
+    const s = alText(h, { sym: cur.sym, name: ciName(), T: tf, px: now, dp: cur.p });
+    alFire(s.text, s.kind, s.say, s.ck);
+  });
+  alSc = st.sc;
   /* 我的止损/止盈：进入 0.5 ATR 提醒，离开 1 ATR 后重新布防 */
   if (AL.sl && TR && TR.sym === cur.sym)
     TR.open.forEach(p =>

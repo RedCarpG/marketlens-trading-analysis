@@ -1,7 +1,8 @@
 'use strict';
 /* 桌宠 Cirra（cirra-deskpet）播报：她开着时在本机事件端口收 POST /notify，端口和每次启动生成的 token 写在 ~/.cirra/endpoint.json
    （CIRRA_ENDPOINT_FILE 可改位置，和 Cirra 用同一个变量名）。协议见 cirra-deskpet 的 docs/stage4.md §4：
-   请求头 X-Cirra-Token、Content-Type: application/json，Host 须为 127.0.0.1:端口；请求体 { text, title?, emotion? }，成功回 204。
+   请求头 X-Cirra-Token、Content-Type: application/json，Host 须为 127.0.0.1:端口；请求体 { text, title?, emotion?, source?, kind? }，成功回 204。
+   source 固定为 market、kind 为预警类型：进她的“行情”来源（可单独设提醒方式），kind=ev 在她自己连着日历时由她丢掉，不会说两遍。
    浏览器页面拿不到 token（她也故意不让网页直接调），所以由本地代理转发。每次发送都重读文件（她重启后端口、token 会变）；
    文件不在或连不上就当她没开，静默跳过，不影响 MarketLens 自己的提醒。 */
 const fs = require('fs');
@@ -35,8 +36,8 @@ function createCirra({ file = FILE, fetchImpl = fetch, now = () => Date.now(), l
     });
   /* 说一句：返回 { ok, reason }。每分钟最多 limit 条（行情剧烈波动时不把她刷屏；她自己也会把排着的合成一句）；
      401 时重读一次文件再试（她刚重启、token 换了） */
-  async function send({ text, emotion = 'neutral' }) {
-    const body = { text: clip(text), emotion: EMOTIONS.includes(emotion) ? emotion : 'neutral' };
+  async function send({ text, emotion = 'neutral', source, kind }) {
+    const body = { text: clip(text), emotion: EMOTIONS.includes(emotion) ? emotion : 'neutral', source, kind };
     if (!body.text) return { ok: false, reason: '没有内容' };
     const ep = read();
     if (!ep) return { ok: false, reason: 'Cirra 没开' };
