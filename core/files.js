@@ -20,6 +20,7 @@ const FILES = [
   'money',
   'demo',
   'backtest',
+  'study',
   'aipack',
   'aiscore',
   'summary',

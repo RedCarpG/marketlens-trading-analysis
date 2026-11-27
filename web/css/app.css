@@ -2842,6 +2842,26 @@ button.jtag.on {
 .rvr td:last-child {
   white-space: normal;
 }
+/* 回测面板里的关键价位统计（SPEC 3.3.16）：一句结论 + 三类线的表 + 四张分组小表 */
+.btlv {
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px solid var(--bd);
+}
+.btlvs {
+  margin: 6px 0 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+.btlv .rvg td:last-child,
+.btlv > table td:last-child {
+  white-space: nowrap;
+}
+/* 事件页“下一个重要事件”卡片里的事件研究那句话 */
+.evh .evst {
+  margin-top: 6px;
+}
 
 /* ===== 路线图第 5 步第一批：波动状态、交易时段、我画的线、预警记录（SPEC 3.3.14） ===== */
 /* 波动状态（分析页“关键数值”里）：一句事实 + 一条刻度（左边最小、右边最大）+ 怎么比的 */

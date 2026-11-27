@@ -126,8 +126,39 @@ async function loadNews(force) {
   NWL = 0;
   evRedraw();
 }
+/* ===== 事件研究（core/study.js，docs/BACKTEST.md 第 19 节）：过去每次非农、CPI、FOMC 公布后价格动了多少 =====
+   要一年左右的 1 小时K线：品种有 Yahoo 代码时经代理另取一份长的（最多 8000 根，约 17 个月），没有就用已加载的 1 小时K线。
+   日历里过去的事件是从用这个工具起慢慢攒的（加上官方日程覆盖的那一年多），所以次数有限，次数少的会标出来。
+   EVS：{ key 品种, busy 正在算, rep evReport 的结果, n 算得出的公布次数, from 最早一根K线, src 用的哪份K线 } */
+let EVS = null;
+async function loadEvStudy() {
+  if (!LOCAL || !EV || !EV.events || !cur) return;
+  const key = cur.sym;
+  if (EVS && EVS.key == key) return;
+  EVS = { key, busy: 1 };
+  let hs = ALL['1h'] || [],
+    src = `已加载的 1 小时K线`;
+  const y = cur.srcs && cur.srcs.yahoo;
+  if (y)
+    try {
+      const r = await fetch(`/api/candles?src=yahoo&symbol=${encodeURIComponent(y)}&interval=1h&count=8000`);
+      if (r.ok) {
+        hs = await r.json();
+        src = `Yahoo ${y} 的 1 小时K线`;
+      }
+    } catch (_) {}
+  if (cur.sym !== key) return;
+  const rows = evStudy(
+    hs,
+    EV.events.filter(e => ccyOf().includes(e.ccy))
+  );
+  EVS = { key, rep: evReport(rows), n: rows.length, from: hs.length ? hs[0].timestamp : null, src };
+  evRedraw();
+}
+const evStudyOf = rel => (EVS && cur && EVS.key == cur.sym && EVS.rep ? EVS.rep.find(r => r.rel == rel) : null);
 /* 事件数据变了：重画事件页、分析页提示和图上标注。倒计时每 30 秒也走这里 */
 function evRedraw() {
+  loadEvStudy(); // 换了品种、日历刚到时算一次；已经算过就什么都不做
   morph(pane('ev'), evPanel());
   if (bars.length && lastM) {
     morph(pane('an'), anPanel(lastM));
@@ -341,8 +372,27 @@ ${ng
     e =>
       `<div class="row sm"><span>${esc(evName(e))}</span><b>${e.actual ? '公布 ' + esc(e.actual) + ' · ' : ''}${e.forecast ? '预期 ' + esc(e.forecast) : ''}${e.previous ? ` <span class="mu">前值 ${esc(e.previous)}</span>` : ''}</b></div>`
   )
-  .join('')}</section>`
-      : `<div class="empty">已获取的日程里没有 ${esc(cc)} 的高影响事件</div>`;
+  .join('')}${[...new Set(ng.map(e => e.rel))]
+          .map(evStudyOf)
+          .filter(Boolean)
+          .map(s => `<div class="note2 evst">${esc(evText(s, cur.p))}</div>`)
+          .join('')}</section>`
+      : `<div class="empty">已获取的日程里没有 ${esc(cc)} 的高影响事件</div>`,
+    /* 事件研究的汇总：三类事件各一行，说明收着 */
+    stRep = EVS && EVS.key == cur.sym && EVS.rep ? EVS.rep : [],
+    study = stRep.length
+      ? blk(
+          'evs',
+          `公布以后一般动多少 <span class="mu">${esc(cur.sym)}</span>`,
+          `${stRep
+            .map(
+              s =>
+                `<div class="evd"><span>${esc(s.name)}<small>${s.n} 次${s.thin ? ' · 次数少' : ''}</small></span><b>${s.ratio.toFixed(1)} 倍</b><span class="dp">波幅 ${s.range.toFixed(cur.p)} · 涨 ${s.up} 跌 ${s.down}</span></div>`
+            )
+            .join('')}
+${more('怎么算的', `用 ${esc(EVS.src)}（${fmt('1d', EVS.from)} 起）。“公布后一小时左右”取公布所在的那根 1 小时K线和下一根，量最高价减最低价；倍数是和公布日之前 40 天里同一时刻的两根比（取中位数，那些天里有别的重要事件的不算）。涨跌看第二根的收盘比第一根的开盘高还是低。只是过去发生过的事：次数很少，方向没有规律，不能用来猜下一次往哪边走。`)}`
+        )
+      : '';
   /* 官方数据（BLS） */
   const D = EV.data || {},
     dat =
@@ -402,6 +452,7 @@ ${ng
           })
           .join('') || '<div class="empty">暂无</div>');
   return `${tools}<div class="srcs">${srcs}</div>${warn}${next}
+${study}
 ${blk('evd', `官方数据 <span class="mu">BLS${D.at ? ' · ' + fmt('1h', D.at) : ''}</span>`, dat + datNote)}
 ${blk('evc', `经济日历 <span class="n">${list.length}</span>`, cal)}
 ${blk('nws', `新闻 <span class="mu">${TOPN[nwTopic()]} · ${EVO.lang == 'zh' ? '中文' : 'English'}</span>`, nt + nws)}

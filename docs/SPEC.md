@@ -356,6 +356,25 @@ K线图铺满整个窗口作为背景，周围的块半透明（背景模糊）�
 - 验证：无头浏览器、模拟品种。三个品种 × 日线 / 1 小时 / 15 分钟对比了改前改后的图；五个主题各看了分析页、预警页和弹出提示；390px 窄屏量了页面宽度（等于屏宽）并逐个打开四个下拉菜单；收起面板、选中持仓时的图也看了；第 5 步第一批的走查（加线、触发、记录、清空）重跑一遍没有变化；窄屏核对了自选第一次收着、展开、选品种后收起，宽屏不受影响。截图在 docs/img/ui-declutter/。
 - 没验证的：真实行情下标签的宽度（价格位数多的品种，比如五位数的比特币，标签会比 164px 宽一些）；触摸屏上的手感。
 
+### 3.3.16 关键价位统计、事件研究（2026-11-27，路线图第 5 步剩下的两项）
+
+路线图的 D1 和 B1。两项都是“过去发生过什么”的统计，只列数，不预测、不给建议。纯计算都在 web/js/core/study.js（加进了 core/files.js 的 FILES 和 web/index.html；对外接口 API 和包版本没动）；做法的细节、真实数据的结果和结论在 docs/BACKTEST.md 第 18、19 节，这里只写页面和接口。
+
+- **关键价位统计**（D1）：价格走到关键价位以后被挡回还是穿过去，和随便一条线比。
+  - 计算：`lvStudy(all, opts)` 逐根回放，返回每一次触及（哪类线、价位、当时的价格和 ATR、从哪边来、之前被挡回几次、来自哪个周期、结果）；`lvReport(study)` 汇总成三类线（关键价位 / 普通价位 / 对照线）和关键价位的四种分组，各带次数、挡回比例和 95% 区间，另报关键价位平均同时有几条、多少时间价格就在某一条上；`lvText(rep)` 写一句话。触及的布防用 `armStep`，结果的判定用 `lvOutcome`，和预警、预警记录是同一套。
+  - 页面：回测面板（分析页“价格行为情景”的“回测”，或快捷键 B）跑完回测接着跑这一项，用同一份K线、同一个入场周期、同一段时间；结果在逐笔明细上面：一句结论、三类线的表、四张分组小表、一段怎么读。后台线程 web/js/bt-worker.js 里算，进度条前一半是回测、后一半是它；它出错不影响回测的结果，只在原处写一行原因。
+  - 那句话的写法：关键价位和对照线的区间不重叠才说“高 / 低，差距超出了误差范围”，否则说“差距在误差范围内”；次数不到 30 加一句“只当记录看”。面板的说明里写着这个比法自己有几个百分点的偏差（BACKTEST 第 18 节的空白对照），差距不到十个点左右不能算数。
+  - 命令行：`npm run study -- levels --data gc [--tf 1d] [--from 2014-01-01] [--to …]`（导入的长周期历史）、`--id 18`（本地K线存储）、`--yahoo GC=F --tf 1h`（经本机代理）。完整结果写到 `var/study/`（本地，不入 Git）。
+- **事件研究**（B1）：非农、CPI、FOMC 公布以后价格一般动多少。
+  - 计算：`evStudy(bars1h, events, opts)` 返回每一次公布的一行（公布后两根 1 小时K线的波幅、平常同一时刻的波幅、倍数、当天的倍数、之后是涨是跌）；`evReport(rows)` 按事件类型汇总（次数、波幅和倍数的中位数、最小最大、涨跌各几次，次数不到 8 的 `thin` 为真）；`evText(r, 小数位)` 写一句话。
+  - 页面（web/js/events.js 的 `loadEvStudy`）：日历到了以后算一次，换品种重算。品种有 Yahoo 代码时经代理另取一份 8000 根的 1 小时K线（约 17 个月），没有就用已加载的 1 小时K线；事件只取这个品种相关货币的。事件页“下一个重要事件”卡片里，下一个事件是这三类之一时多一句（`evText`）；卡片下面多一块“公布以后一般动多少”，三类各一行（次数、倍数、波幅中位数、涨跌次数），“怎么算的”收着。算不出来（没有代理、K线太短、日历里没有过去的事件）时这两处都不显示，不报错。
+  - 只在经代理打开时有（公开演示页没有经济日历）。
+  - 命令行：`npm run study -- events [--yahoo GC=F]`（代理要开着），多打印逐次的明细。
+- 措辞：两处的句子里都没有“会涨 / 会跌 / 建议”（有测试）；事件那一句只说过去几次涨、几次跌，“怎么算的”里写明方向没有规律、不能用来猜下一次。
+- 测试：tests/study.test.js 8 项——三类线都记得到、字段齐全；不偷看未来（数据截断前后早先的触及完全一样）；空白对照（随机游走上关键价位不比对照线强，同时把这个比法的偏差和价位有多密钉住）；汇总和句子的算术与写法；事件的窗口、对照、去重、休市和对照不够时跳过；汇总和句子。`npm test` 共 118 项。
+- 浏览器里核对过（真实 GOLD，经代理）：事件页那一句和那一块的数字与命令行一致（非农 13 次 1.4 倍、CPI 13 次 1.5 倍、FOMC 7 次 3.8 倍并标了“次数少”）；回测面板跑完后出现关键价位统计，三类线和四张分组表都有数，分组小表没有被撑宽；控制台没有新的报错。
+- **没有验证的**：没有截图（真实账户的页面不截图，模拟品种上没有另外看样子）；深色 / 浅色主题和窄屏下这两处的样子；别的品种（代码不挑品种）；不经代理的静态页面只确认了不显示事件研究这一条逻辑，没有实际打开看。
+
 ### 3.4 预警接口
 
 ```js
@@ -472,6 +491,7 @@ web/
    │  ├─ context.js        情境：波动状态（ATR 在过去一年里的排位）、交易时段（划分、分段、各时段波幅）（3.3.14）
    │  ├─ money.js          金额币种与汇率换算（CCY / fxAt / fmtMoney）
    │  ├─ backtest.js       回测引擎（逐根回放、模拟成交、出场规则、统计；页面回测面板与命令行共用，见 docs/BACKTEST.md）
+   │  ├─ study.js          两项研究：关键价位统计（lvStudy/lvReport/lvText）、事件研究（evStudy/evReport/evText）（3.3.16，结果见 docs/BACKTEST.md 第 18、19 节）
    │  ├─ aipack.js         AI 分析包与提问模板（buildPack/packPrompt）
    │  ├─ aiscore.js        AI 分析记录的前瞻打分（scoreAi/aiStats）
    │  ├─ summary.js        给页面以外的调用方：从K线直接得到分析、压成几句事实（analyzeCandles/describeState）；页面不加载
@@ -492,13 +512,13 @@ web/
    ├─ panel.js             周期矩阵与右侧面板（分析 / 交易 / 事件 / 预警标签页）
    ├─ review-ui.js         交易复盘面板
    ├─ backtest-ui.js       回测面板（选项、汇总、资金曲线、分组、明细，点一笔在图上查看）
-   ├─ bt-worker.js         回测后台线程（加载 core/，跑 btPage）
+   ├─ bt-worker.js         回测后台线程（加载 core/，跑 btPage，接着跑关键价位统计）
    └─ app.js               全局状态、主题、数据加载、整页布局（两侧收起、价格轴让位、专注模式、快捷键）、初始化（最后加载）
 ```
 
 - 各文件共享全局作用域（普通脚本，非 ES 模块）：只有 app.js 末尾的 `init()` 和少量常量初始化在加载时执行，其余都是函数，调用时才互相引用，所以除“config.js 在前、app.js 最后”外顺序不敏感。
 - 代理只托管 `web/` 下的 html/css/js（路径规范化后必须仍在 web/ 内），旧地址 `/market-analyzer.html` 302 跳到首页。
-- 测试：项目根目录 `npm test`（Node 自带 node:test）。`core/load.js` 在 vm 中按浏览器顺序加载 web/js/core/（`tests/load-core.js` 只是转一下）；`tests/summary.test.js` 验证 analyzeCandles 与 describeState；`tests/corepkg.test.js` 验证打出来的 marketlens-core 包与源码结果一致（见第 11 节）；`tests/golden.test.js` 对比 `tests/fixtures/golden-demo.json`（模拟数据，不含真实行情）；`tests/review.test.js` 验证复盘只用开仓前已收盘的K线并与 analyzeMTF 一致；`tests/store.test.js` 验证K线存储合并与读写；`tests/core.test.js` 为时间网格、已收盘判断、摆动点、前高前低、价位合并、情景触发（含收紧选项）、汇率取值与金额格式等单元测试；`tests/backtest.test.js` 验证回测不偷看未来、只限定入场区间、模拟成交规则、统计函数，并在随机游走数据上做空白对照；`tests/import-history.test.js` 验证历史导入的清洗、日期归一与周线/月线聚合；`tests/yahoo.test.js` 验证 Yahoo 数据的解析、清洗、日内对齐与聚合（不联网）；`tests/events.test.js` 验证经济日历与新闻（美东时间与夏令时换算、Forex Factory / BLS 日程 / RSS / Atom 解析、与官方日程核对合并、BLS 数值计算、缓存与失败回退、改期替换、公布后重查官方数据）；`tests/cirra.test.js` 验证桌宠 Cirra 播报（按她的协议发送、她没开时跳过、token 更换后重读、限速、状态，以及代理 `/api/cirra/notify` 的拒绝规则和按类型定表情）；`tests/aiscore.test.js` 验证 AI 分析留痕（记录读写、倾向解析、meta 清洗）与前瞻打分；`tests/aipack.test.js` 验证 AI 分析包（内容、范围、截短、未覆盖的写法、大小）；`tests/aiscore.test.js` 验证分析记录的打分；`tests/watch.test.js` 验证代理的常驻预警（首轮只建基准、到价说一次、重启不重复、间隔太久重新建基准）。`tests/context.test.js` 验证波动状态与交易时段，`tests/alertlog.test.js` 验证我画的线与预警记录（见 3.3.14）。回测命令行 `npm run backtest`（tools/backtest.js，读本地K线存储或 `--data` 指定的导入历史，结果写到 var/backtest/）；`npm run import`（tools/import-history.js）从 Yahoo（黄金期货日线）、Binance（分页）或 CSV 导入长周期历史到 var/history/；`npm run bt:compare`（tools/bt-compare.js）按事先定好的几组情景规则并行回放、计入成本对比。核心算法有意改动时需重新生成标准答案。
+- 测试：项目根目录 `npm test`（Node 自带 node:test）。`core/load.js` 在 vm 中按浏览器顺序加载 web/js/core/（`tests/load-core.js` 只是转一下）；`tests/summary.test.js` 验证 analyzeCandles 与 describeState；`tests/corepkg.test.js` 验证打出来的 marketlens-core 包与源码结果一致（见第 11 节）；`tests/golden.test.js` 对比 `tests/fixtures/golden-demo.json`（模拟数据，不含真实行情）；`tests/review.test.js` 验证复盘只用开仓前已收盘的K线并与 analyzeMTF 一致；`tests/store.test.js` 验证K线存储合并与读写；`tests/core.test.js` 为时间网格、已收盘判断、摆动点、前高前低、价位合并、情景触发（含收紧选项）、汇率取值与金额格式等单元测试；`tests/backtest.test.js` 验证回测不偷看未来、只限定入场区间、模拟成交规则、统计函数，并在随机游走数据上做空白对照；`tests/import-history.test.js` 验证历史导入的清洗、日期归一与周线/月线聚合；`tests/yahoo.test.js` 验证 Yahoo 数据的解析、清洗、日内对齐与聚合（不联网）；`tests/events.test.js` 验证经济日历与新闻（美东时间与夏令时换算、Forex Factory / BLS 日程 / RSS / Atom 解析、与官方日程核对合并、BLS 数值计算、缓存与失败回退、改期替换、公布后重查官方数据）；`tests/cirra.test.js` 验证桌宠 Cirra 播报（按她的协议发送、她没开时跳过、token 更换后重读、限速、状态，以及代理 `/api/cirra/notify` 的拒绝规则和按类型定表情）；`tests/aiscore.test.js` 验证 AI 分析留痕（记录读写、倾向解析、meta 清洗）与前瞻打分；`tests/aipack.test.js` 验证 AI 分析包（内容、范围、截短、未覆盖的写法、大小）；`tests/aiscore.test.js` 验证分析记录的打分；`tests/watch.test.js` 验证代理的常驻预警（首轮只建基准、到价说一次、重启不重复、间隔太久重新建基准）。`tests/context.test.js` 验证波动状态与交易时段，`tests/alertlog.test.js` 验证我画的线与预警记录（见 3.3.14）；`tests/study.test.js` 验证关键价位统计（不偷看未来、随机游走上的空白对照）与事件研究（见 3.3.16），命令行 `npm run study`（tools/study.js，结果写到 var/study/）。回测命令行 `npm run backtest`（tools/backtest.js，读本地K线存储或 `--data` 指定的导入历史，结果写到 var/backtest/）；`npm run import`（tools/import-history.js）从 Yahoo（黄金期货日线）、Binance（分页）或 CSV 导入长周期历史到 var/history/；`npm run bt:compare`（tools/bt-compare.js）按事先定好的几组情景规则并行回放、计入成本对比。核心算法有意改动时需重新生成标准答案。
 - 格式化：`npm run format`（Prettier 3.3.3，配置见 `.prettierrc.json`）。
 
 ## 11. 核心库 marketlens-core（2026-11-26，路线图第 1 步）

@@ -7,6 +7,7 @@
     "test": "node --test",
     "backtest": "node tools/backtest.js",
     "bt:compare": "node tools/bt-compare.js",
+    "study": "node tools/study.js",
     "import": "node tools/import-history.js",
     "build:core": "node core/build.js",
     "pack:core": "node core/build.js && cd core && npm pack",

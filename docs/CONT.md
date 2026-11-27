@@ -2,7 +2,7 @@
 
 （2026-10-24 由 FinBot 更名为 MarketLens；本地目录同日改为 X:\Project\MarketLens，浏览器本地偏好键前缀改为 marketlens. 并自动迁移旧的 finbot.*）
 
-更新：2026-11-26；状态：规格v0.4；当前阶段：eToro GOLD 数据源、交易记录、复盘、经济日历与新闻、Cirra 播报与常驻预警均已接入；之后的方向和顺序见 docs/ROADMAP.md。密钥配置、真实联调记录、个人交易记录与复盘结果只保存在本地 docs/private/LOCAL_NOTES.md（不入 Git）。
+更新：2026-11-27；状态：规格v0.4；当前阶段：eToro GOLD 数据源、交易记录、复盘、经济日历与新闻、Cirra 播报与常驻预警均已接入；之后的方向和顺序见 docs/ROADMAP.md。密钥配置、真实联调记录、个人交易记录与复盘结果只保存在本地 docs/private/LOCAL_NOTES.md（不入 Git）。
 
 目标：个人行情观察与分析工具，以黄金期货GC为主，KLineChart图表，规则评分与参考计划，后续加预警与回测；只读行情，不下单。分析方法为自上而下多周期：1M/1w定背景→1d结构→4h区域→1h/15m触发（SPEC 3.5节）；页面已实现1w/1M、analyzeMTF与周期状态矩阵初版（仅模拟数据验证，权重未回测）。
 
@@ -88,7 +88,9 @@ Cirra 插件 1.1.0（2026-11-26，路线图第 2 步，在 X:\Project\Cirra\cirr
 
 云端的内容并回本机（2026-11-27）：两条云端分支（claude/busy-tesla-2iwogl 即 PR 2，和叠在它上面的 claude/ui-declutter）一次合进了本地 main（44a1e67，没有冲突），之后的开发回到本机。合之前在本机核对过：测试 110 项通过；真实 GOLD 数据下页面没有报错，波动状态和各时段波幅都算出来了（这是云端没法验的）；模拟品种上看过时段底色、加线删线、浅色主题的标签。并回时改了一处：自己画的线交给 Cirra 的类型从 lv 改成 ml（代理的 KIND 加一项，页面仍归在“关键价位”那个勾选），否则 Cirra 插件 1.2.0 自己盯着同一品种时会把它当重复丢掉；代理认得新类型已实际发过一次请求确认。还没验的：真实行情下标签的宽度（五位数价格）、Cirra 真的念出画线那一句。
 
-下一步：用户在 Cirra 里更新并打开插件、验收（第 2、4 步）；在交易页定自己的守则，用真实交易看复盘面板（第 3 步）；然后是第 5 步剩下的 B1（事件研究）、D1（关键价位统计），要用本机 var/ 里的历史K线。见 docs/ROADMAP.md §5。情景入场条件仍无优势，不再细调；GC数据（eToro Micro Gold期货拼接连续合约或另找GC源）以后再议。
+第 5 步剩下的两项（2026-11-27，本机；main 先推送到了 7e9170c，这两项的改动还没提交）：新增 web/js/core/study.js（关键价位统计 lvStudy / lvReport / lvText；事件研究 evStudy / evReport / evText），加进了 core/files.js 的 FILES 和 web/index.html，对外接口 API 和包版本没动；tools/study.js 和 `npm run study`（levels / events 两个子命令，结果写到 var/study/）；回测面板跑完接着出关键价位统计（web/js/bt-worker.js、web/js/backtest-ui.js）；事件页“下一个重要事件”卡片多一句、下面多一块“公布以后一般动多少”（web/js/events.js 的 loadEvStudy，经代理另取 8000 根 Yahoo 1 小时K线）。结论：关键价位不比随便一条过去的收盘价更能挡（黄金日线 25 年 56% 对 58%，黄金前后两半、1 小时、比特币都一样；这个比法在随机游走上自己有 8 个点左右的偏差）；非农、CPI 公布后一小时左右的波幅是平常的一倍半左右，FOMC 3.8 倍（只有 7 次），方向没有规律。数字和做法在 docs/BACKTEST.md 第 18、19 节，页面在 SPEC 3.3.16。测试 tests/study.test.js，共 118 项通过；真实 GOLD 经代理在浏览器里核对了两处的数字，没有截图，主题和窄屏下的样子没看。路线图 §5 表里排好的步骤到此做完。
+
+下一步：用户在 Cirra 里更新并打开插件、验收（第 2、4 步）；在交易页定自己的守则，用真实交易看复盘面板（第 3 步）；第 5 步的验收。再往后的在 docs/ROADMAP.md §5 的“以后再看”（行情卡小窗、盘感训练、B3、B5、C2），还没排顺序。情景入场条件仍无优势，不再细调；GC数据（eToro Micro Gold期货拼接连续合约或另找GC源）以后再议。
 
 已定（2026-10-22）：先用eToro GOLD（黄金CFD），GC期货数据源以后再议。
 待定：Binance适配器是否需要验证；v0.3中未写入项目说明的内容（手动ChatGPT分析包、SQLite留痕）是否还要。（经济日历与新闻的真实联调已于 2026-11-26 通过；DATA_VALIDATION.md 已归档。）GitHub：当前仓库 https://github.com/RedCarpG/marketlens-trading-analysis（公开；2026-10-24 由 web-trading-MarketLens-app 改名；命名：全小写连字符，品牌名 + 用途；main），.env、server/node_modules、work/ 均未上传。

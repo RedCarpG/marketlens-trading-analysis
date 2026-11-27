@@ -113,7 +113,14 @@ function runBacktest() {
   const local = () =>
     setTimeout(() => {
       try {
-        done(btPage(job));
+        const res = btPage(job);
+        /* 和后台线程一样，接着跑关键价位统计；它出错不影响回测的结果 */
+        try {
+          res.lv = lvReport(lvStudy(job.all, { tf: T }));
+        } catch (e) {
+          res.lvErr = e.message || String(e);
+        }
+        done(res);
       } catch (e) {
         fail(e.message);
       }
@@ -216,6 +223,36 @@ function renderBacktest() {
 <td>${{ target: '目标', stop: '止损', trail: '移动/保本', timeout: '超时', open: '未结束' }[t.res] || t.res}</td><td>${t.bars ?? '—'}</td><td style="color:${dc(t.R)}">${t.R == null ? '—' : f2(t.R)}</td></tr>`
     )
     .join('');
+  /* 关键价位统计（core/study.js）：走到价位以后被挡回还是穿过去，和随便一条线比。r.lv 由回测线程一起算出来 */
+  const lv = r.lv,
+    pc = v => (v == null ? '—' : Math.round(v * 100) + '%'),
+    lvRow = g =>
+      `<tr><td>${g.name}</td><td>${g.n}</td><td>${g.bounce}</td><td>${g.brk}</td><td>${g.open}</td><td>${pc(g.rate)}${g.thin ? '<span class="mu">*</span>' : ''}</td><td class="mu">${g.rate == null ? '' : `${pc(g.lo)}–${pc(g.hi)}`}</td></tr>`,
+    lvHead =
+      '<tr><th></th><th>触及</th><th>被挡回</th><th>穿过去</th><th>未定</th><th>挡回比例</th><th>95% 区间</th></tr>',
+    /* 分组的小表窄，只留次数、比例和区间 */
+    lvRow2 = g =>
+      `<tr><td>${g.name}</td><td>${g.n}</td><td>${pc(g.rate)}${g.thin ? '<span class="mu">*</span>' : ''}</td><td class="mu">${g.rate == null ? '' : `${pc(g.lo)}–${pc(g.hi)}`}</td></tr>`,
+    lvHead2 = '<tr><th></th><th>触及</th><th>挡回比例</th><th>95% 区间</th></tr>',
+    lvSec = lv
+      ? `<div class="rvr btlv"><div class="mu sm">关键价位统计：价格走到一条线（0.25 个 ATR 以内）之后 ${lv.n} 根，先往回走 1 个 ATR 算被挡回，先穿过去 1 个 ATR 算穿过去</div>
+<div class="btlvs">${esc(lvText(lv))}</div>
+<table>${lvHead}${lv.kinds.map(lvRow).join('')}</table>
+<div class="rvg">${[
+          ['之前被挡回的次数', lv.groups.touch],
+          ['来自哪个周期', lv.groups.top],
+          ['几个周期都有', lv.groups.tfs],
+          ['在试支撑还是阻力', lv.groups.side],
+        ]
+          .map(
+            ([t, gs]) =>
+              `<div><div class="mu sm">关键价位 · ${t}</div><table>${lvHead2}${gs.map(lvRow2).join('')}</table></div>`
+          )
+          .join('')}</div>
+<div class="mu sm">关键价位平均同时有 ${lv.keys.toFixed(1)} 条，${pc(lv.atKey)} 的时间收盘价就在某一条的 0.25 个 ATR 以内——线越密，“走到关键价位了”这句话的信息越少。对照线是随便取的过去的收盘价（离关键价位至少 0.25 个 ATR）。价格是走过来碰到线的，所以随便一条线也是被挡回的略多；这个比法在纯随机的数据上自己就有几个百分点的偏差，差距不到十个点左右不能算数。“从上面来 / 从下面来”的差别多半是这段时间整体在涨还是在跌。* = 不足 30 次。</div></div>`
+      : r.lvErr
+        ? `<div class="mu sm">关键价位统计没算成：${esc(r.lvErr)}</div>`
+        : '';
   el.innerHTML = `<div class="rvp">
 ${btHead(` · ${r.tf} · ${fmt(r.tf, r.from)} → ${fmt(r.tf, r.to)}（${r.steps.toLocaleString()} 根）`)}
 ${btOpts()}
@@ -229,6 +266,7 @@ ${svg}
 <div class="rvg"><div style="grid-column:span 2"><div class="mu sm">信号（之后 5 根，单位 ATR；净优势 = 减去每根都同向持有的基准）</div><table><tr><th>信号</th><th>方向</th><th>次数</th><th>命中</th><th>均值</th><th>净优势</th><th>样本内</th><th>样本外</th></tr>${sigs}</table></div>
 <div><div class="mu sm">入场时机评分（之后 10 根）</div><table><tr><th>分数</th><th>根数</th><th>均值</th><th>上涨</th></tr>${buckets}</table>
 <div class="mu sm" style="margin-top:6px">秩相关：5 根 ${f2(sc.rho[5].all.s)}，10 根 ${f2(sc.rho[10].all.s)}（样本外 ${f2(sc.rho[10].oos.s)}）<br>偏多 ${st.long.n} 根 均值 ${f2(st.long.mean)}；偏空 ${st.short.n} 根 均值 ${f2(st.short.mean)}（按方向）</div></div></div>
+${lvSec}
 <div class="mu sm" style="margin:10px 0 4px">情景交易明细（新到旧；入场 / 止损 / 目标；点一行在图上查看）</div>
 <div class="rvtw btlist"><table class="rvt"><tr><th>触发</th><th>方向</th><th>类型</th><th>入场 / 止损 / 目标</th><th>大周期</th><th>出场</th><th>持仓</th><th>R</th></tr>${rows}</table></div>
 <div class="mu sm" style="margin-top:10px">每根K线收盘时只用当时已收盘的K线，按页面同一套规则判断；入场 = 触发K线收盘价；同一根K线止损和目标都触及按先止损；跳空按开盘价成交。成本为估计值。* = 不足 30 笔。回测结果不代表未来表现，不构成投资建议；方法与结论见 docs/BACKTEST.md。</div>
