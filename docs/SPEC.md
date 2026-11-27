@@ -598,4 +598,4 @@ web/
   - 没有加进去的：看哪几样相关品种、用哪个合约代码（那是调用方的配置，页面的在 web/js/config.js）；波动状态、交易时段、事件研究、持仓的止损止盈判定这些页面上有的计算，等真用到再加。
   - 包的大小 81 KB → 114 KB，主要是 0.2.0 以后 `web/js/core/` 里多出来的脚本（研究、情境）都拼在同一个文件里，不管对外给不给名字。
   - 验证：`tests/corepkg.test.js` 加了三处——打出来的两份和源码算出的相关品种、期货持仓一致；取数入口里的 `createCftc` 用假的上游取两期、交给打出来的 `cotState` / `cotText` 得到那一句话；复制进包的文件清单。`npm test` 共 133 项。把 tgz 装进一个空项目，用 `import` 从两个入口各取名字，真的去取了 Yahoo 和 CFTC：三样相关品种的数、那句汇总、CFTC 的 110 期和那句话、新闻的 `dropped`，都和页面上看到的一致；`describeState` 照旧能用。用 TypeScript 6.0（严格模式、nodenext）对着装好的包检查了一份使用它的代码，类型文件没有报错。
-  - **还没做的**：cirra-plugins 那边把依赖换成 0.3.0（那个仓库归它的管理会话，等第 8 步开工时一起换）。
+  - 用它的是 Cirra 插件 1.3.0（路线图第 8 步的行情卡，2026-11-27，在 cirra-plugins 的本地 DEV）：用了 `relRow`、`relText`、`relChg` 和原来就有的 `mainLv`、`describeState`；期货持仓那两个和 `createCftc` 卡上没用。
