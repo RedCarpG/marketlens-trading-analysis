@@ -153,7 +153,7 @@ ${evRisk()}
 ${aiBlock()}
 ${m.why.length ? blk('why', `评分说明 <span class="n">${m.why.length}</span>`, `<ul class="why">${m.why.map(w => `<li>${w}</li>`).join('')}</ul>`) : ''}
 ${blk('sc', `价格行为情景 <span class="mu">${tf} · 纯K线</span>`, scn, chip('pl', '图上') + '<button class="chip" id="btgo" title="用当前品种的历史K线回测情景、信号和评分（B）">回测</button>')}
-${blk('lv', `关键价位 <span class="mu" title="${tf} 和更大周期的价位">${tf}+</span>`, keys, chip('hl', '前高前低') + chip('sr', '支撑阻力'))}
+${blk('lv', `<span title="${tf} 和更大周期的价位，每行写着来自哪些周期">关键价位</span>`, keys, chip('hl', '前高前低') + chip('sr', '支撑阻力'))}
 ${blk('sg', `近期信号 <span class="n">${sigs.length}</span>`, sgl, chip('ar', '图上'))}
 ${blk('kv', `关键数值 <span class="mu">${tf}</span>`, `<div class="row"><span>RSI(14)</span><b>${a.rsi.toFixed(1)}</b></div><div class="row"><span>ATR(14)</span><b>${f(a.a)}</b></div>${volBlock()}${a.hv ? '' : '<div class="row"><span>成交量</span><b class="mu">无（放量项不计分）</b></div>'}`)}
 ${ssBlock()}
