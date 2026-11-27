@@ -554,7 +554,12 @@ function regOverlays() {
     });
   });
 }
-const cssv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+/* 取主题颜色。三位写法的十六进制（浅色主题的 #fff）补成六位：很多地方在颜色后面直接拼两位透明度（如 bg + 'cc'），
+   三位的拼出来不是有效颜色，画布会沿用上一次的填充色，标签就成了一块实心色块 */
+const cssv = n => {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  return /^#[0-9a-f]{3}$/i.test(v) ? '#' + [...v.slice(1)].map(c => c + c).join('') : v;
+};
 /* 图上点击：交易/持仓/信号箭头可点击高亮；点在图上空白处取消高亮（拖动图表不算点击）。
    ovHit 记录刚点中图形的时间，让随后冒泡上来的 DOM click 不再当作“点空白” */
 let ovHit = 0,
