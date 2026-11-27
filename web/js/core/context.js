@@ -201,3 +201,49 @@ function relText(rows, name) {
   if (none.length) parts.push(`${none.join('、')}和${name}看不出明显关系`);
   return `最近 ${Math.min(...ok.map(x => x.n))} 个交易日：${parts.join('；')}。`;
 }
+
+/* ===== 期货持仓（CFTC 每周报告）=====
+   rows：[{ ts 那一期是哪天的（UTC 零点，通常是周二）, oi 总未平仓, long, short }]，旧的在前；long / short 是“管理基金”一类的多、空手数。
+   只列数：这一期净多（多减空）多少、前一期多少、在之前 COT_WIN 期里排在哪。持仓多或少都不说明之后往哪走。
+   返回 { ts, long, short, net, oi, prev: { ts, long, short, net } | null, n 比了几期, below 其中几期的净多比这一期少, pct 百分比（比不到 COT_MIN 期时为 null） }；
+   一期都没有返回 null */
+const COT_WIN = 52,
+  COT_MIN = 10;
+function cotState(rows) {
+  const n = rows.length;
+  if (!n) return null;
+  const net = r => r.long - r.short,
+    cur = rows[n - 1],
+    p = n > 1 ? rows[n - 2] : null,
+    past = rows.slice(Math.max(0, n - 1 - COT_WIN), n - 1),
+    below = past.filter(r => net(r) < net(cur)).length;
+  return {
+    ts: cur.ts,
+    long: cur.long,
+    short: cur.short,
+    net: net(cur),
+    oi: cur.oi,
+    prev: p ? { ts: p.ts, long: p.long, short: p.short, net: net(p) } : null,
+    n: past.length,
+    below,
+    pct: past.length >= COT_MIN ? Math.round((below / past.length) * 100) : null,
+  };
+}
+/* 手数写成带千分位的整数；净头寸写成“净多 102,942 手 / 净空 5,000 手 / 多空相等” */
+const cotNum = v => String(Math.abs(Math.round(v))).replace(/\B(?=(\d{3})+$)/g, ',');
+const cotNet = v => (v > 0 ? `净多 ${cotNum(v)} 手` : v < 0 ? `净空 ${cotNum(v)} 手` : '多空相等');
+/* 写成一句：“截至 11 月 17 日（周二）：管理基金在黄金期货上净多 102,942 手（多 121,994、空 19,052），前一期是净多 112,341 手；
+   之前 52 期里有 38% 的净多头比这一期少。” name 是合约念出来的名字。排位那半句在能比的期数不够时不写；全都比它少 / 没有比它少的直接说 */
+function cotText(v, { name, who = '管理基金' }) {
+  const d = new Date(v.ts),
+    day = `${d.getUTCMonth() + 1} 月 ${d.getUTCDate()} 日（周${'日一二三四五六'[d.getUTCDay()]}）`,
+    rank =
+      v.pct == null
+        ? ''
+        : v.below == v.n
+          ? `；是之前 ${v.n} 期里最高的`
+          : !v.below
+            ? `；是之前 ${v.n} 期里最低的`
+            : `；之前 ${v.n} 期里有 ${Math.max(1, Math.min(99, v.pct))}% 比这一期低`;
+  return `截至 ${day}：${who}在${name}上${cotNet(v.net)}（多 ${cotNum(v.long)}、空 ${cotNum(v.short)}）${v.prev ? `，前一期是${cotNet(v.prev.net)}` : ''}${rank}。`;
+}

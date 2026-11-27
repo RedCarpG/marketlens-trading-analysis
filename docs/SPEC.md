@@ -405,14 +405,28 @@ K线图铺满整个窗口作为背景，周围的块半透明（背景模糊）�
   - 只列数：不写“美元涨所以黄金跌”，不由此推以后。“怎么算的”里写明相关不说明谁带动谁，过去反着走不等于以后还反着走。
   - 取数（web/js/related.js）：日线经本地代理从 Yahoo 取（150 根，约延迟 10–15 分钟），十分钟取一次，一样都没取到时一分钟后再试。被比的这一边：品种有 Yahoo 代码时也用 Yahoo 的日线（看 eToro 的 GOLD 时用的是 GC=F，同一家的日期好对齐），没有就用已加载的日线（比特币用 Binance 的）。只在经代理打开、看真实品种时有；公开演示页、模拟品种、CSV 没有这一块。
   - 代码的选择：美元指数用 ICE 的现货指数 `DX-Y.NYB`（期货 `DX=F` 在 Yahoo 上取不到），收益率用 `^TNX`，白银用期货 `SI=F`。
-  - `relRow` / `relText` / `relChg` 在 core/context.js 里（已在 core/files.js 的 FILES），还没有列进 marketlens-core 的对外接口；第 8 步的行情卡要用时再加并发新版本。
+  - `relRow` / `relText` / `relChg` 在 core/context.js 里，marketlens-core 0.3.0 起列进了对外接口（第 11 节末尾）。
 - **新闻去噪**（server/events.js）：
   - 黄金主题：搜索词是“黄金 OR 金价”，会带进“65mm 黄金焦段”的手机评测、“黄金海岸”“黄金一代”这类。加了一张表 `NOISE`：标题命中“黄金 + 焦段 / 时段 / 搭档 / 海岸 / 一代…”这类说法，而且一个行情词（金价、现货黄金、盎司、美联储、央行、美元…）都没有的丢掉。宁可留下一条不相干的，也不丢一条说金价的（“黄金时段金价跳水”“黄金周金饰消费回暖”都留着）。只筛搜索来的那一路，美联储新闻稿和 `.env` 里自己加的 RSS 不筛。返回里多一项 `dropped`，新闻块最下面写“另有 N 条不相干的没列出来”。
   - 宏观主题的中文搜索词里“美元”改成“美元指数”：光搜“美元”，凡是标题里有金额的都进来（球员薪资、并购、融资）。实测 100 条里有 34 条不相干，改了以后剩 3 条（那 3 条其实是汇率的）。英文搜索词没动（实测没有这个问题）。
-  - 这份文件会原样打进 marketlens-core 的取数入口，Cirra 插件那边要等下一次发版才用上新的。
+  - 这份文件会原样打进 marketlens-core 的取数入口，0.3.0 里已经是新的；Cirra 插件那边要等它换成 0.3.0 才用上。
 - 测试：tests/context.test.js 加 3 项（当天 / 5 天的变化和相关的算术、按共同交易日对齐、基点、样本不够和常数时不算、门槛两边的归类、60 天那一档；句子的写法、没有因果和预测的词）；tests/events.test.js 加 1 项（哪些丢、哪些不丢、只筛搜索那一路、计数、宏观的搜索词）。`npm test` 共 129 项。
 - 真实数据核对（2026-11-27，经本机代理）：黄金页面三行都算出来了（当天：美元指数 +0.35%、10 年期收益率 +8.8 基点、白银期货 +9.11%，和当天的新闻标题对得上；最近 20 个交易日白银和黄金相关 0.94，美元指数 −0.01、收益率 0.17，都归到“看不出”）；比特币页面也算得出来（黄金期货 20 天 0.55 差一点、60 天 0.47，写成“60 天里偏同向”）。重启代理后中文黄金新闻 60 条、筛掉 4 条（三条“黄金焦段”的手机评测、一条“黄金海岸”），留下的里面没有“焦段”；中文宏观新闻里只是带美元金额的从三成左右降到 1 条。窄面板（约 460px）里三行都没有被撑宽。控制台没有报错。
 - **没有验证的**：周末、节假日时“当天”那一列的样子（各品种最后一根日线不是同一天时，名字旁边的日期会不一样）；浅色主题；别的品种（要用得在 config.js 里给它写 `rel`）。去噪的那张表是照这一次看到的写的，以后有新的说法还得加。
+
+### 3.3.19 期货持仓：CFTC 每周报告（2026-11-27，路线图第 9 步）
+
+分析页“相关品种”下面多一块“期货持仓”，现在只有黄金有。路线图的 B5，只做了 CFTC；黄金 ETF 持仓没找到能直接读的来源，没做。
+
+- **数据**：美国商品期货交易委员会（CFTC）每周的持仓报告（分类版，只含期货），COMEX 黄金期货（合约代码 088691，一手 100 盎司）。只取“管理基金”（Managed Money：对冲基金、商品交易顾问这类）的多、空和全部未平仓。每一期是周二收盘时的持仓，通常周五下午（美东）公布，所以看到时至少是三天前的事。代理取数和缓存见 server/README.md“CFTC 每周持仓”（`GET /api/cftc?code=`，6 小时取一次，存在 `var/cftc/`）。
+- **显示**：一句话（`cotText`）——“截至 11 月 17 日（周二）：管理基金在黄金期货上净多 102,942 手（多 121,994、空 19,052），前一期是净多 112,341 手；之前 52 期里有 35% 比这一期低。”；一条刻度（这一期的净多在之前 52 期里的位置，左边最少、右边最多）；三行数——管理基金的多、空（后面的小字是比前一期多了还是少了）、全部未平仓；收着的“这是什么、怎么读”。这一期超过 10 天时加一句“已经是 N 天前的了”；代理没取到新的、显示的是存着的时也说一声。
+- **计算**（core/context.js 的 `cotState`）：净多 = 多减空；前一期的多、空、净多；拿这一期的净多和它之前 52 期比，数有几期比它低；能比的不到 10 期时不排位。句子里前一期直接写它的数（“前一期是净多 …”），不写“增加 / 减少”，净空的时候也不会读反。
+- **只列数**：句子和说明里没有“看涨 / 看跌 / 拥挤 / 见顶”这类词（有测试）；说明里写明这是一份滞后的记录，持仓多或少都不说明接下来往哪边走，这里不拿它当信号。
+- 哪个品种有：自选列表里写了 `cot: { code, name }` 的（web/js/config.js），现在只有黄金 GOLD。比特币的 CME 期货在 CFTC 的另一份报告里（金融期货，分类不一样），没接。只在经代理打开、看真实品种时有。页面一小时问代理一次（web/js/related.js 的 `loadCot` / `cotBlock`）。
+- `cotState` / `cotText` 和取数的 `createCftc`，marketlens-core 0.3.0 起都在包里（第 11 节末尾）。
+- 测试：tests/cftc.test.js 4 项——接口的行解析（字符串转数、排序、坏行丢掉、同一天只留一条、合约代码的格式）；取一次存下来、6 小时内不再取、失败时回存着的并带原因、10 分钟后才再试、重启后从文件读回、没存过又取不到时报错；净多和排位的算术、期数不够时不排；千分位、净多 / 净空 / 相等的写法、句子里没有判断的词。`npm test` 共 133 项。
+- 真实数据核对（2026-11-27，经本机代理）：取到 110 期（2024-10-15 到 2026-11-17，一周一期没有断；109 期是周二，一期因为节假日是周一，句子里写的是那一期实际的星期），页面上的多、空、未平仓和直接查 CFTC 接口的一致，比前一期的变化（多 −5,412、空 +3,987）和 CFTC 自己给的周变化字段一致；刻度在 35% 的位置；窄面板里没有被撑宽；控制台没有报错。
+- **没有验证的**：新一期公布后页面跟不跟着变（要等下一期；代理 6 小时、页面 1 小时各自重取）；CFTC 接口坏掉时真实的样子（只用假的上游测过）；浅色主题。
 
 ### 3.4 预警接口
 
@@ -527,7 +541,7 @@ web/
    │  ├─ rules.js          我的守则与开仓体检（normRules/checkRules/checkSay/ruleStats）
    │  ├─ alertrules.js     价位和情景预警的判定与句子（页面和代理共用）
    │  ├─ alertlog.js       我画的预警线（整理、到价判定、句子）、预警记录（整理、价位类预警之后怎样了）（3.3.14）
-   │  ├─ context.js        情境：波动状态（ATR 在过去一年里的排位）、交易时段（划分、分段、各时段波幅）（3.3.14）、相关品种（涨跌与相关，3.3.18）
+   │  ├─ context.js        情境：波动状态（ATR 在过去一年里的排位）、交易时段（划分、分段、各时段波幅）（3.3.14）、相关品种（涨跌与相关，3.3.18）、期货持仓（CFTC 每周报告的净多和排位，3.3.19）
    │  ├─ money.js          金额币种与汇率换算（CCY / fxAt / fmtMoney）
    │  ├─ backtest.js       回测引擎（逐根回放、模拟成交、出场规则、统计；页面回测面板与命令行共用，见 docs/BACKTEST.md）
    │  ├─ study.js          两项研究：关键价位统计（lvStudy/lvReport/lvText）、事件研究（evStudy/evReport/evText）（3.3.16，结果见 docs/BACKTEST.md 第 18、19 节）
@@ -548,7 +562,7 @@ web/
    ├─ cirra.js             桌宠 Cirra 播报：预警交给本地代理转给 Cirra、预警页的“Cirra 播报”块
    ├─ hover.js             悬停高亮与信息卡
    ├─ chart-indicators.js  指标开关、配色、自定义绘制、页面自绘的图例、图表高度
-   ├─ related.js           相关品种：经代理取 Yahoo 日线、分析页的那一块（3.3.18）
+   ├─ related.js           分析页里要另外取数的两块：相关品种（经代理取 Yahoo 日线，3.3.18）、期货持仓（经代理取 CFTC 每周报告，3.3.19）
    ├─ panel.js             周期矩阵与右侧面板（分析 / 交易 / 事件 / 预警标签页）
    ├─ review-ui.js         交易复盘面板
    ├─ backtest-ui.js       回测面板（选项、汇总、资金曲线、分组、明细，点一笔在图上查看）
@@ -558,7 +572,7 @@ web/
 
 - 各文件共享全局作用域（普通脚本，非 ES 模块）：只有 app.js 末尾的 `init()` 和少量常量初始化在加载时执行，其余都是函数，调用时才互相引用，所以除“config.js 在前、app.js 最后”外顺序不敏感。
 - 代理只托管 `web/` 下的 html/css/js（路径规范化后必须仍在 web/ 内），旧地址 `/market-analyzer.html` 302 跳到首页。
-- 测试：项目根目录 `npm test`（Node 自带 node:test）。`core/load.js` 在 vm 中按浏览器顺序加载 web/js/core/（`tests/load-core.js` 只是转一下）；`tests/summary.test.js` 验证 analyzeCandles 与 describeState；`tests/corepkg.test.js` 验证打出来的 marketlens-core 包与源码结果一致（见第 11 节）；`tests/golden.test.js` 对比 `tests/fixtures/golden-demo.json`（模拟数据，不含真实行情）；`tests/review.test.js` 验证复盘只用开仓前已收盘的K线并与 analyzeMTF 一致；`tests/store.test.js` 验证K线存储合并与读写；`tests/core.test.js` 为时间网格、已收盘判断、摆动点、前高前低、价位合并、情景触发（含收紧选项）、汇率取值与金额格式等单元测试；`tests/backtest.test.js` 验证回测不偷看未来、只限定入场区间、模拟成交规则、统计函数，并在随机游走数据上做空白对照；`tests/import-history.test.js` 验证历史导入的清洗、日期归一与周线/月线聚合；`tests/yahoo.test.js` 验证 Yahoo 数据的解析、清洗、日内对齐与聚合（不联网）；`tests/events.test.js` 验证经济日历与新闻（美东时间与夏令时换算、Forex Factory / BLS 日程 / RSS / Atom 解析、与官方日程核对合并、BLS 数值计算、缓存与失败回退、改期替换、公布后重查官方数据）；`tests/cirra.test.js` 验证桌宠 Cirra 播报（按她的协议发送、她没开时跳过、token 更换后重读、限速、状态，以及代理 `/api/cirra/notify` 的拒绝规则和按类型定表情）；`tests/aiscore.test.js` 验证 AI 分析留痕（记录读写、倾向解析、meta 清洗）与前瞻打分；`tests/aipack.test.js` 验证 AI 分析包（内容、范围、截短、未覆盖的写法、大小）；`tests/aiscore.test.js` 验证分析记录的打分；`tests/watch.test.js` 验证代理的常驻预警（首轮只建基准、到价说一次、重启不重复、间隔太久重新建基准）；`tests/poswatch.test.js` 验证代理的持仓看守（见 3.3.17）。`tests/context.test.js` 验证波动状态与交易时段，`tests/alertlog.test.js` 验证我画的线与预警记录（见 3.3.14）；`tests/study.test.js` 验证关键价位统计（不偷看未来、随机游走上的空白对照）与事件研究（见 3.3.16），命令行 `npm run study`（tools/study.js，结果写到 var/study/）。回测命令行 `npm run backtest`（tools/backtest.js，读本地K线存储或 `--data` 指定的导入历史，结果写到 var/backtest/）；`npm run import`（tools/import-history.js）从 Yahoo（黄金期货日线）、Binance（分页）或 CSV 导入长周期历史到 var/history/；`npm run bt:compare`（tools/bt-compare.js）按事先定好的几组情景规则并行回放、计入成本对比。核心算法有意改动时需重新生成标准答案。
+- 测试：项目根目录 `npm test`（Node 自带 node:test）。`core/load.js` 在 vm 中按浏览器顺序加载 web/js/core/（`tests/load-core.js` 只是转一下）；`tests/summary.test.js` 验证 analyzeCandles 与 describeState；`tests/corepkg.test.js` 验证打出来的 marketlens-core 包与源码结果一致（见第 11 节）；`tests/golden.test.js` 对比 `tests/fixtures/golden-demo.json`（模拟数据，不含真实行情）；`tests/review.test.js` 验证复盘只用开仓前已收盘的K线并与 analyzeMTF 一致；`tests/store.test.js` 验证K线存储合并与读写；`tests/core.test.js` 为时间网格、已收盘判断、摆动点、前高前低、价位合并、情景触发（含收紧选项）、汇率取值与金额格式等单元测试；`tests/backtest.test.js` 验证回测不偷看未来、只限定入场区间、模拟成交规则、统计函数，并在随机游走数据上做空白对照；`tests/import-history.test.js` 验证历史导入的清洗、日期归一与周线/月线聚合；`tests/yahoo.test.js` 验证 Yahoo 数据的解析、清洗、日内对齐与聚合（不联网）；`tests/events.test.js` 验证经济日历与新闻（美东时间与夏令时换算、Forex Factory / BLS 日程 / RSS / Atom 解析、与官方日程核对合并、BLS 数值计算、缓存与失败回退、改期替换、公布后重查官方数据）；`tests/cirra.test.js` 验证桌宠 Cirra 播报（按她的协议发送、她没开时跳过、token 更换后重读、限速、状态，以及代理 `/api/cirra/notify` 的拒绝规则和按类型定表情）；`tests/aiscore.test.js` 验证 AI 分析留痕（记录读写、倾向解析、meta 清洗）与前瞻打分；`tests/aipack.test.js` 验证 AI 分析包（内容、范围、截短、未覆盖的写法、大小）；`tests/aiscore.test.js` 验证分析记录的打分；`tests/watch.test.js` 验证代理的常驻预警（首轮只建基准、到价说一次、重启不重复、间隔太久重新建基准）；`tests/poswatch.test.js` 验证代理的持仓看守（见 3.3.17）；`tests/cftc.test.js` 验证 CFTC 每周持仓的取数、缓存和那一句话（见 3.3.19）。`tests/context.test.js` 验证波动状态与交易时段，`tests/alertlog.test.js` 验证我画的线与预警记录（见 3.3.14）；`tests/study.test.js` 验证关键价位统计（不偷看未来、随机游走上的空白对照）与事件研究（见 3.3.16），命令行 `npm run study`（tools/study.js，结果写到 var/study/）。回测命令行 `npm run backtest`（tools/backtest.js，读本地K线存储或 `--data` 指定的导入历史，结果写到 var/backtest/）；`npm run import`（tools/import-history.js）从 Yahoo（黄金期货日线）、Binance（分页）或 CSV 导入长周期历史到 var/history/；`npm run bt:compare`（tools/bt-compare.js）按事先定好的几组情景规则并行回放、计入成本对比。核心算法有意改动时需重新生成标准答案。
 - 格式化：`npm run format`（Prettier 3.3.3，配置见 `.prettierrc.json`）。
 
 ## 11. 核心库 marketlens-core（2026-11-26，路线图第 1 步）
@@ -578,3 +592,10 @@ web/
 - **0.2.0（2026-11-27，路线图第 4 步）加第二个入口 `marketlens-core/data`：取数。** 就是代理自己的 `server/yahoo.js`（Yahoo 的K线和报价）和 `server/events.js`（经济日历、BLS 数据、新闻），`core/build.js` 原样复制成 `dist/data/*.cjs`，再加一个只导出对外名字的 `index.cjs`（`createYahoo`、`createEvents`、`parseFeeds`、`TOPIC`、`LANGS`），类型在 `core/data.d.ts`。这两个模块只依赖 Node 自带的 fs / path 和 fetch；打包时发现别的 require 会直接报错。为了给别的程序用，`createYahoo` 的请求函数、`createEvents` 的提示函数都可以换掉（原来就能换请求函数和时间）。代理照旧直接 require 它们，不需要构建。测试（tests/corepkg.test.js）：打出来的入口 require 和 import 都认得出名字；用假的请求核对 Yahoo 的K线和报价；所有来源都取不到时日历不抛错、内置的 FOMC 日程还在、来源状态里写着没取到。
 - 用它的是 Cirra 插件 1.2.0：MarketLens 没开时她自己取数、自己盯价位（cirra-plugins 的 `docs/marketlens.md` §8）。实际跑过：停掉代理，编好的插件取到了 Yahoo GC=F 的报价和各周期K线、12 月的非农 / FOMC / CPI 日程、BLS 最新数据、新闻标题，早上两句都说了，也开始自己看 1 小时图；开着代理时她照旧用代理（eToro GOLD），不自己去取。
 - 代理的常驻预警（server/watch.js）同一天改成默认不开：这件事归插件了，两边都开会说两遍。`.env` 写 `CIRRA_WATCH=gold` 可以再打开。
+- **0.3.0（2026-11-27，Release `core-v0.3.0`）：情境的计算、CFTC 取数、新闻去噪。** 给路线图第 8 步的行情卡准备的。
+  - 计算这一边对外多了 5 个名字：`relRow`、`relText`、`relChg`（相关品种，3.3.18）和 `cotState`、`cotText`（期货持仓，3.3.19）。类型和说明在 `core/index.d.ts`，用法在 `core/README.md` 的“情境”。0.2.0 的接口一个都没动。
+  - 取数这一边多了 `createCftc`（就是代理的 `server/cftc.js`，原样复制进 `dist/data/cftc.cjs`），取回来的行直接交给 `cotState`。`server/events.js` 的新闻去噪（3.3.18）跟着进了包，`news()` 的返回多一项 `dropped`。
+  - 没有加进去的：看哪几样相关品种、用哪个合约代码（那是调用方的配置，页面的在 web/js/config.js）；波动状态、交易时段、事件研究、持仓的止损止盈判定这些页面上有的计算，等真用到再加。
+  - 包的大小 81 KB → 114 KB，主要是 0.2.0 以后 `web/js/core/` 里多出来的脚本（研究、情境）都拼在同一个文件里，不管对外给不给名字。
+  - 验证：`tests/corepkg.test.js` 加了三处——打出来的两份和源码算出的相关品种、期货持仓一致；取数入口里的 `createCftc` 用假的上游取两期、交给打出来的 `cotState` / `cotText` 得到那一句话；复制进包的文件清单。`npm test` 共 133 项。把 tgz 装进一个空项目，用 `import` 从两个入口各取名字，真的去取了 Yahoo 和 CFTC：三样相关品种的数、那句汇总、CFTC 的 110 期和那句话、新闻的 `dropped`，都和页面上看到的一致；`describeState` 照旧能用。用 TypeScript 6.0（严格模式、nodenext）对着装好的包检查了一份使用它的代码，类型文件没有报错。
+  - **还没做的**：cirra-plugins 那边把依赖换成 0.3.0（那个仓库归它的管理会话，等第 8 步开工时一起换）。

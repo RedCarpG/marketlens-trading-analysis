@@ -1,7 +1,7 @@
 {
   "name": "marketlens-core",
-  "version": "0.2.0",
-  "description": "MarketLens's reckoning for other programs: multi-timeframe state, key levels, alert rules and plain-text summaries for AI, plus the public-data fetchers (Yahoo candles, economic calendar, news). Read-only facts, no trading advice.",
+  "version": "0.3.0",
+  "description": "MarketLens's reckoning for other programs: multi-timeframe state, key levels, alert rules, related-instrument and futures-positioning context and plain-text summaries for AI, plus the public-data fetchers (Yahoo candles, economic calendar, news, CFTC positioning). Read-only facts, no trading advice.",
   "license": "UNLICENSED",
   "author": "RedCarpG",
   "repository": {

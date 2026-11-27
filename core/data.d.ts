@@ -1,8 +1,8 @@
-// marketlens-core/data 的类型（0.2.0 起）：取数。实现就是 MarketLens 本地代理用的 server/yahoo.js、server/events.js。
+// marketlens-core/data 的类型（0.2.0 起）：取数。实现就是 MarketLens 本地代理用的 server/yahoo.js、server/events.js、server/cftc.js（0.3.0 起）。
 // 都是公开来源、不需要密钥。请求函数可以换掉（测试时不访问网络）；日历和 BLS 数据缓存在调用方给的目录里。
 // 这些来源不是给程序大量调用的：模块自己有缓存和失败后的间隔，调用方不要绕过它另外去拉。
 
-import type { Candle, Tf } from './index.js';
+import type { Candle, CotRow, Tf } from './index.js';
 
 export const VERSION: string;
 
@@ -76,6 +76,8 @@ export interface News {
   at: number;
   topic: string;
   lang: string;
+  /** 0.3.0 起：搜索结果里筛掉了几条不相干的（黄金主题里“黄金焦段”这类，标题的词不是在说金价）。 */
+  dropped: number;
   items: NewsItem[];
   sources: (SourceState & { n: number })[];
 }
@@ -104,3 +106,33 @@ export function parseFeeds(text: string | undefined): { name: string; url: strin
 /** 新闻的主题和语言（news() 只认这些）。 */
 export const TOPIC: Record<string, Record<string, string>>;
 export const LANGS: Record<string, Record<string, string>>;
+
+/** CFTC 每周持仓报告里一个合约的最近 110 期（0.3.0 起）。rows 旧到新，交给 marketlens-core 的 cotState。 */
+export interface CftcReport {
+  code: string;
+  /** 报告里的合约名和合约单位，例如 “GOLD - COMMODITY EXCHANGE INC.”、“(CONTRACTS OF 100 TROY OUNCES)”。 */
+  name: string;
+  units: string;
+  /** 最后一次取到的时间。 */
+  at: number;
+  rows: CotRow[];
+  /** 最近一次没取到新的时的原因；这时 rows 是存着的那份。 */
+  err?: string;
+}
+export interface Cftc {
+  /**
+   * 取一个合约的持仓。code 是 CFTC 的 6 位合约代码（COMEX 黄金期货 088691）。
+   * 每一期是周二收盘时的持仓、通常周五公布；6 小时内复用上次的，取不到时回存着的并带 err，10 分钟后才再试。
+   * 一期都没有又取不到、或代码格式不对时抛错（后者带 status 400）。
+   */
+  get(code: string): Promise<CftcReport>;
+}
+/** CFTC 的公开接口（分类版持仓报告、只含期货），不需要密钥。 */
+export function createCftc(options: {
+  /** 存取回来的数据的目录（<代码>.json），没有会自己建。 */
+  dir: string;
+  fetchImpl?: typeof fetch;
+  now?: () => number;
+  ua?: string;
+  warn?: (message: string) => void;
+}): Cftc;

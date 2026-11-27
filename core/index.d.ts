@@ -159,6 +159,72 @@ export function alText(
   o: { sym: string; name: string; T: Tf; px: number; dp?: number }
 ): { text: string; say: string; kind: string; ck: 'lv' | 'sc' | 'scx' };
 
+/* ===== 情境（0.3.0 起）：都只列数，不说谁带动谁，也不由此推以后 ===== */
+
+/** 相关品种里的一样（relRow 的结果）。pct 时变化是比例（0.0031 = +0.31%），bp 时是基点。 */
+export interface RelRow {
+  /** 最新一根的收盘，和它是哪一天的。 */
+  last: number;
+  ts: number;
+  /** 最新一根比前一根、比 5 根之前；K线不到 6 根时 d5 为 null。 */
+  d1: number;
+  d5: number | null;
+  /** 近的那个相关用了几个共同的交易日（最多 20）、相关系数；不到 12 个或有一边没动时 r 为 null。 */
+  n: number;
+  r: number | null;
+  /** 1 同向、-1 反向、0 看不出（|r| 不到 0.55）、null 没算出来。 */
+  rel: Bias | null;
+  /** 长的那个（最多 60 个交易日）：比近的多才有；relL 要至少 40 个交易日、|rL| 到 0.33 才给方向。 */
+  nL: number | null;
+  rL: number | null;
+  relL: Bias | null;
+}
+/**
+ * 一样相关的东西最近动了多少、和被比的那个是一起动还是反着动。base、bars 是两边的日线（旧到新，只用 timestamp 和 close）。
+ * 相关按两边都有K线的日子算（一边休市的那天两边都跳过）。unit 是 'bp' 时变化按基点（收益率这类本身是百分数的）。K线不到 2 根返回 null。
+ */
+export function relRow(
+  base: Pick<Candle, 'timestamp' | 'close'>[],
+  bars: Pick<Candle, 'timestamp' | 'close'>[],
+  opt?: { unit?: 'pct' | 'bp'; win?: number; long?: number }
+): RelRow | null;
+/** 一个变化写成字：'+0.31%'、'−4.3 基点'；null 写成 '—'。 */
+export function relChg(v: number | null, unit?: 'pct' | 'bp'): string;
+/**
+ * 几样合成一句：“最近 20 个交易日：白银期货和黄金多半同涨同跌；美元指数和黄金看不出明显关系。”
+ * rows 里每项是 relRow 的结果加一个 name；没算出相关的（rel 为 null）不提。name 是被比的那个品种念出来的名字。一条都没有时返回空串。
+ */
+export function relText(rows: (({ name: string } & Pick<RelRow, 'n' | 'rel'> & Partial<Pick<RelRow, 'r' | 'nL' | 'relL'>>) | null)[], name: string): string;
+
+/** CFTC 每周持仓报告里的一期：管理基金（Managed Money）的多、空手数和总未平仓。marketlens-core/data 的 createCftc 取回来的就是这个。 */
+export interface CotRow {
+  /** 那一期是哪天的（UTC 零点，通常是周二）。 */
+  ts: number;
+  oi: number;
+  long: number;
+  short: number;
+}
+export interface CotState {
+  ts: number;
+  long: number;
+  short: number;
+  /** 净多 = 多减空；负数是净空。 */
+  net: number;
+  oi: number;
+  prev: { ts: number; long: number; short: number; net: number } | null;
+  /** 和之前几期比（最多 52 期）、其中几期的净多比这一期低；能比的不到 10 期时 pct 为 null。 */
+  n: number;
+  below: number;
+  pct: number | null;
+}
+/** 最新一期的净多、前一期、在之前 52 期里排在哪。rows 旧到新；一期都没有返回 null。 */
+export function cotState(rows: CotRow[]): CotState | null;
+/**
+ * 写成一句：“截至 11 月 17 日（周二）：管理基金在黄金期货上净多 102,942 手（多 121,994、空 19,052），前一期是净多 112,341 手；之前 52 期里有 35% 比这一期低。”
+ * 这是至少三天前的持仓，不是信号：别说成“看涨 / 看跌”。name 是合约念出来的名字。
+ */
+export function cotText(v: CotState, o: { name: string; who?: string }): string;
+
 /** 一次 AI 分析的记录（server/ailog.js 存的那些字段里打分要用的）。 */
 export interface AiRecord {
   id: string;

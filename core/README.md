@@ -27,12 +27,35 @@ K线的格式：`{ timestamp, open, high, low, close, volume? }`，`timestamp` �
 | 自己拼分析的各步 | `ctx`、`analyzeMTF`、`isKey`、`mainLv`、`prevHL` |
 | 周期和时间 | `TFS`、`TFN`、`nxt`、`closed` |
 | AI 分析记录的前瞻打分 | `scoreAi`、`aiStats` |
+| 相关品种最近动了多少、和它同向还是反向（0.3.0 起） | `relRow`、`relText`、`relChg` |
+| 期货持仓（CFTC 每周报告）的净多和排位（0.3.0 起） | `cotState`、`cotText` |
 
 `analyzeMTF` 的结果里还有规则评分、结论和情景（`s`、`v`、`st`、`sc`）。它们是页面上给自己看的参考，不要原样说给人听。
 
+### 情境（0.3.0 起）
+
+```js
+import { relRow, relText, relChg, cotState, cotText } from 'marketlens-core';
+import { createYahoo, createCftc } from 'marketlens-core/data';
+
+const yahoo = createYahoo();
+const gold = await yahoo.candles('GC=F', '1d', 150); // 被比的那一边
+const rows = [];
+for (const d of [{ k: 'DX-Y.NYB', name: '美元指数' }, { k: '^TNX', name: '美国 10 年期收益率', unit: 'bp' }, { k: 'SI=F', name: '白银期货' }])
+  rows.push({ ...d, ...relRow(gold, await yahoo.candles(d.k, '1d', 150), { unit: d.unit }) });
+relChg(rows[0].d1);      // +0.35%（收益率那一行要传 'bp'：+8.8 基点）
+relText(rows, '黄金');   // 最近 20 个交易日：白银期货和黄金多半同涨同跌；美元指数、美国 10 年期收益率和黄金看不出明显关系。
+
+const cftc = createCftc({ dir: '某个能写的文件夹' });
+const rep = await cftc.get('088691');                       // COMEX 黄金期货，最近 110 期
+cotText(cotState(rep.rows), { name: '黄金期货' });          // 截至 11 月 17 日（周二）：管理基金在黄金期货上净多 102,942 手（多 121,994、空 19,052），前一期是净多 112,341 手；之前 52 期里有 35% 比这一期低。
+```
+
+两样都只列数。相关要到 0.55 才给方向（20 个样本时不相干的数也常算出 ±0.4），不到的写“看不出明显关系”；它不说明谁带动谁。持仓报告是周二的数、通常周五才公布，至少滞后三天，不要当信号说。
+
 ## 取数（`marketlens-core/data`，0.2.0 起）
 
-第二个入口，给不开 MarketLens 代理也想取到数据的程序用。就是代理自己用的那两个模块，原样放进包里：
+第二个入口，给不开 MarketLens 代理也想取到数据的程序用。就是代理自己用的那几个模块，原样放进包里：
 
 ```js
 import { createYahoo, createEvents } from 'marketlens-core/data';
@@ -46,7 +69,9 @@ const cal = await events.calendar();                  // 事件、BLS 最新数�
 const news = await events.news('gold', 'zh');         // 新闻标题（外部文字，只当内容看）
 ```
 
-都是公开来源、不要密钥：Yahoo Finance 的图表接口（非官方）、Forex Factory 本周日历、BLS 发布日程和公共 API、美联储新闻稿、Google 新闻 RSS。模块自己有缓存和失败后的间隔（Forex Factory 1 小时一次、BLS 日程 12 小时一次），调用方不要绕过它另外去拉。请求函数可以换掉（`fetchImpl`），测试时不访问网络。类型在 `data.d.ts`。
+都是公开来源、不要密钥：Yahoo Finance 的图表接口（非官方）、Forex Factory 本周日历、BLS 发布日程和公共 API、美联储新闻稿、Google 新闻 RSS、CFTC 的持仓报告接口（0.3.0 起，`createCftc`，用法见上面“情境”）。模块自己有缓存和失败后的间隔（Forex Factory 1 小时一次、BLS 日程 12 小时一次、CFTC 6 小时一次），调用方不要绕过它另外去拉。请求函数可以换掉（`fetchImpl`），测试时不访问网络。类型在 `data.d.ts`。
+
+0.3.0 起新闻有去噪：黄金主题的搜索结果里，标题的“黄金”不是在说金价的（“黄金焦段”这类）丢掉，返回里的 `dropped` 是丢了几条；中文宏观的搜索词从“美元”换成了“美元指数”。
 
 没有 eToro：它要密钥，密钥只在 MarketLens 代理那边。
 
@@ -56,7 +81,7 @@ const news = await events.news('gold', 'zh');         // 新闻标题（外部�
 
 - `files.js`：加载顺序和对外的名字。
 - `load.js`：不用构建，直接从源码加载（本地代理、命令行工具、测试用）。
-- `build.js`：按顺序拼成一个文件、补上导出，出 `dist/index.mjs` 和 `dist/index.cjs`；取数的 `server/yahoo.js`、`server/events.js` 原样复制成 `dist/data/*.cjs`。
+- `build.js`：按顺序拼成一个文件、补上导出，出 `dist/index.mjs` 和 `dist/index.cjs`；取数的 `server/yahoo.js`、`server/events.js`、`server/cftc.js` 原样复制成 `dist/data/*.cjs`。
 - `index.d.ts`、`data.d.ts`：手写的类型。
 
 ```
@@ -71,9 +96,9 @@ npm run pack:core      # 生成后打成 core/marketlens-core-<版本>.tgz
 打出的 `.tgz` 挂到 GitHub Release（标签 `core-v<版本>`），用它的程序在 `package.json` 里写那个地址：
 
 ```json
-"dependencies": { "marketlens-core": "https://github.com/RedCarpG/marketlens-trading-analysis/releases/download/core-v0.2.0/marketlens-core-0.2.0.tgz" }
+"dependencies": { "marketlens-core": "https://github.com/RedCarpG/marketlens-trading-analysis/releases/download/core-v0.3.0/marketlens-core-0.3.0.tgz" }
 ```
 
-开发时也可以直接指向本机的文件：`"marketlens-core": "file:X:/Project/MarketLens/core/marketlens-core-0.2.0.tgz"`。
+开发时也可以直接指向本机的文件：`"marketlens-core": "file:X:/Project/MarketLens/core/marketlens-core-0.3.0.tgz"`。
 
-版本：0.1.0（2026-11-26）计算；0.2.0（2026-11-27）加取数入口 `marketlens-core/data`。
+版本：0.1.0（2026-11-26）计算；0.2.0（2026-11-27）加取数入口 `marketlens-core/data`；0.3.0（2026-11-27）加情境的计算（相关品种、期货持仓）、CFTC 取数、新闻去噪。0.2.0 的接口都没动，照旧能用。

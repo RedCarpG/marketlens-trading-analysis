@@ -5,7 +5,8 @@ const LOCAL = /^(127\.0\.0\.1|localhost|\[::1\])$/.test(location.hostname) && lo
 /* grp：左侧分组；新增品种时指定分组，GRPS 决定分组顺序。
    srcs：可切换的数据服务 → 该服务里的代码（src 为默认，设置里可改，按品种记在本地；服务说明见 data.js 的 SRCN）
    ccy：经济日历里与它相关的货币（默认 USD）；news：新闻主题 gold / btc（不写为宏观），见 events.js；
-   rel：分析页“相关品种”那一块看哪几样（related.js）——k 是 Yahoo 的代码，p 小数位，unit: 'bp' 表示变化按基点写（收益率） */
+   rel：分析页“相关品种”那一块看哪几样（related.js）——k 是 Yahoo 的代码，p 小数位，unit: 'bp' 表示变化按基点写（收益率）；
+   cot：分析页“期货持仓”那一块用哪个合约的 CFTC 报告——code 是 CFTC 的 6 位合约代码（COMEX 黄金期货 088691），name 是念出来的名字 */
 const REL_DXY = { k: 'DX-Y.NYB', name: '美元指数', p: 2 },
   REL_US10 = { k: '^TNX', name: '美国 10 年期收益率', p: 2, unit: 'bp' };
 const WL = [
@@ -18,6 +19,7 @@ const WL = [
     grp: '黄金',
     news: 'gold',
     rel: [REL_DXY, REL_US10, { k: 'SI=F', name: '白银期货', p: 2 }],
+    cot: { code: '088691', name: '黄金期货' },
   },
   {
     sym: 'BTCUSDT',

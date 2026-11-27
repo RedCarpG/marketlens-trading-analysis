@@ -2957,6 +2957,13 @@ button.jtag.on {
 .rlr .rh {
   text-align: right;
 }
+/* 期货持仓（分析页，SPEC 3.3.19）：数字后面的小字是比前一期多了还是少了 */
+.cotd {
+  margin-left: 4px;
+  font-size: 11.5px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
 /* 我画的线（预警页）：输入价格 / 在图上点；每条线一行，✕ 删掉 */
 .mla {
   display: flex;

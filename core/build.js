@@ -2,9 +2,9 @@
 /* 打包 marketlens-core。两个入口：
    1. 计算（marketlens-core）：把 web/js/core/ 的脚本按 files.js 的顺序拼成一个文件，末尾补上导出。
       出两份内容相同的：dist/index.mjs（import 用）和 dist/index.cjs（require 用）。
-   2. 取数（marketlens-core/data，0.2.0 起）：本地代理用的 server/yahoo.js、server/events.js 原样复制成
-      dist/data/*.cjs，再加一个只导出对外名字的 dist/data/index.cjs。
-   源码都不用改，页面照旧直接加载那些脚本、代理照旧 require 那两个模块，都不需要构建；
+   2. 取数（marketlens-core/data，0.2.0 起）：本地代理用的 server/yahoo.js、server/events.js、server/cftc.js（0.3.0 起）
+      原样复制成 dist/data/*.cjs，再加一个只导出对外名字的 dist/data/index.cjs。
+   源码都不用改，页面照旧直接加载那些脚本、代理照旧 require 那几个模块，都不需要构建；
    这一步只在要把它们交给别的程序（Cirra 插件）时才跑。
      node core/build.js          生成 core/dist/
      npm run pack:core           生成后打成 core/marketlens-core-<版本>.tgz

@@ -10,6 +10,7 @@
    GET /api/fx?ccy=EUR|CNY                              → 汇率：1 美元 = ? 目标货币的日线与当前值（交易页金额换算用）
    GET /api/events/calendar                             → 经济日历（Forex Factory + BLS / 美联储官方日程）与 BLS 最新官方数据
    GET /api/events/news?topic=&lang=                    → 新闻（RSS，按主题和语言）
+   GET /api/cftc?code=                                  → CFTC 每周持仓报告里管理基金的多、空和总未平仓（见 cftc.js）
    GET /api/cirra/status                                → 桌宠 Cirra 开没开（见 cirra.js）
    POST /api/cirra/notify  { text, kind }               → 让 Cirra 把一条预警说出来
    POST /api/cirra/prefs   { sl, ck }                   → 持仓看守说不说止损 / 止盈、开仓体检（它自己的两个开关，见 poswatch.js）
@@ -28,6 +29,7 @@ const { createWatch, parseWatch } = require('./watch');
 const { createAiLog, parseBias, cleanMeta } = require('./ailog');
 const { createJournal } = require('./journal');
 const { createPosWatch, parsePos } = require('./poswatch');
+const { createCftc, CODE: CFTC_CODE } = require('./cftc');
 
 const ROOT = path.resolve(__dirname, '..');
 function loadEnv(f) {
@@ -110,6 +112,8 @@ const TKEYS = !!(E.ETORO_TRADE_API_KEY && E.ETORO_TRADE_USER_KEY);
 const trader = createTrader({ apiKey: E.ETORO_TRADE_API_KEY, userKey: E.ETORO_TRADE_USER_KEY, baseUrl: E.ETORO_BASE_URL || 'https://public-api.etoro.com' });
 /* 经济日历与新闻：公开来源，不需要密钥；拉到的日历存在 var/events（EVENTS_DIR 可改位置） */
 const events = createEvents({ dir: E.EVENTS_DIR || path.join(ROOT, 'var', 'events'), ua: E.EVENTS_UA || undefined, blsKey: E.BLS_API_KEY || '', feeds: parseFeeds(E.NEWS_FEEDS) });
+/* CFTC 每周持仓报告：公开数据，不需要密钥；取来的存在 var/cftc（CFTC_DIR 可改位置），见 cftc.js */
+const cftc = createCftc({ dir: E.CFTC_DIR || path.join(ROOT, 'var', 'cftc') });
 /* 桌宠 Cirra：读她写的 endpoint 文件，把预警转给她的 /notify */
 const cirra = createCirra(E.CIRRA_ENDPOINT_FILE ? { file: E.CIRRA_ENDPOINT_FILE } : {});
 /* “让 Cirra 分析”要她有 POST /ask；她的主线没有这个接口，默认收起，CIRRA_ASK=1 才在页面上显示 */
@@ -277,6 +281,13 @@ const server = http.createServer(async (req, res) => {
     if (!TOPIC[topic] || !LANGS[lang]) return json(res, 400, { error: `topic 须为 ${Object.keys(TOPIC).join('/')}，lang 须为 ${Object.keys(LANGS).join('/')}` });
     try { return json(res, 200, await events.news(topic, lang)); }
     catch (e) { console.warn(`[news] ${e.message}`); return json(res, 502, { error: e.message }); }
+  }
+  /* CFTC 每周持仓：?code=6 位合约代码（黄金期货 088691）。取不到又没有存着的回 502；有存着的照回，带 err */
+  if (u.pathname === '/api/cftc') {
+    const code = u.searchParams.get('code') || '';
+    if (!CFTC_CODE.test(code)) return json(res, 400, { error: 'code 须为 6 位数字或大写字母' });
+    try { return json(res, 200, await cftc.get(code)); }
+    catch (e) { return json(res, 502, { error: e.message }); }
   }
   /* 本地K线存储概况：每个品种/周期的根数与起止时间 */
   if (u.pathname === '/api/store') return json(res, 200, store.list());

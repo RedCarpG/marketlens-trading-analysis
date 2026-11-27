@@ -78,6 +78,20 @@ test('打出来的包和源码（vm 加载）算出的结果一样：分析、�
       }
     }
     assert.equal(cjs.packPrompt({ a: 1 }), src.packPrompt({ a: 1 }));
+    /* 情境（0.3.0 起）：相关品种、期货持仓 */
+    const gc = plain(get('demoAll')({ sym: 'GC', base: 2650 }))['1d'],
+      eur = plain(get('demoAll')({ sym: 'EURUSD', base: 1.08 }))['1d'],
+      cot = Array.from({ length: 60 }, (_, i) => ({ ts: Date.UTC(2025, 9, 7) + i * 7 * 864e5, oi: 400000 + i, long: 100000 + ((i * 7919) % 30000), short: 20000 + ((i * 104729) % 9000) })),
+      ctxOf = c => {
+        const row = c.relRow(gc, eur),
+          bp = c.relRow(gc, eur, { unit: 'bp' }),
+          v = c.cotState(cot);
+        return plain({ row, bp, chg: [c.relChg(row.d1), c.relChg(bp.d1, 'bp'), c.relChg(null)], say: c.relText([{ name: '欧元', ...row }], '黄金'), v, cot: c.cotText(v, { name: '黄金期货' }) });
+      },
+      wantCtx = ctxOf(src);
+    assert.ok(wantCtx.row.n == 20 && wantCtx.row.r != null && wantCtx.v.n == 52 && /^截至 /.test(wantCtx.cot), '情境的几项应该都算得出来');
+    assert.deepEqual(ctxOf(cjs), wantCtx, 'require 用的那份：相关品种、期货持仓');
+    assert.deepEqual(ctxOf(mjs), wantCtx, 'import 用的那份：相关品种、期货持仓');
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -142,6 +156,22 @@ test('取数入口（marketlens-core/data）：打出来能用，import 也认�
     assert.deepEqual(cal.sources.filter(s => !s.ok).map(s => s.name).sort(), ['BLS 发布日程', 'BLS 官方数据', 'Forex Factory 本周日历']);
     assert.ok(warned.length >= 2 && warned.every(m => /离线/.test(m)));
     assert.deepEqual((await events.news('gold', 'zh')).items, []);
+    /* CFTC 每周持仓（0.3.0 起）：照它的接口回两期；取回来的行直接交给计算那一边的 cotState */
+    const cftc = data.createCftc({
+        dir: path.join(dir, 'cftc'),
+        warn: () => {},
+        fetchImpl: async url => {
+          asked.push(String(url));
+          const row = (d, l, s) => ({ report_date_as_yyyy_mm_dd: d + 'T00:00:00.000', market_and_exchange_names: 'GOLD - COMMODITY EXCHANGE INC.', contract_units: '(CONTRACTS OF 100 TROY OUNCES)', open_interest_all: '400000', m_money_positions_long_all: String(l), m_money_positions_short_all: String(s) });
+          return new Response(JSON.stringify([row('2026-11-17', 121994, 19052), row('2026-11-10', 127406, 15065)]));
+        },
+      }),
+      rep = await cftc.get('088691');
+    assert.match(asked.at(-1), /^https:\/\/publicreporting\.cftc\.gov\/resource\/72hh-3qpy\.json\?cftc_contract_market_code=088691&/);
+    assert.deepEqual([rep.name, rep.rows.length, rep.rows[1].long], ['GOLD - COMMODITY EXCHANGE INC.', 2, 121994]);
+    const core = require(path.join(dir, 'index.cjs'));
+    assert.equal(core.cotText(core.cotState(rep.rows), { name: '黄金期货' }), '截至 11 月 17 日（周二）：管理基金在黄金期货上净多 102,942 手（多 121,994、空 19,052），前一期是净多 112,341 手。');
+    await assert.rejects(cftc.get('gold'), /6 位/);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -150,7 +180,7 @@ test('取数入口（marketlens-core/data）：打出来能用，import 也认�
 test('取数的模块只用 Node 自带的 fs / path（打进包里不带别的依赖）', () => {
   const { dataFiles } = require('../core/build');
   const files = dataFiles();
-  assert.deepEqual(Object.keys(files).sort(), ['data/events.cjs', 'data/index.cjs', 'data/yahoo.cjs']);
+  assert.deepEqual(Object.keys(files).sort(), ['data/cftc.cjs', 'data/events.cjs', 'data/index.cjs', 'data/yahoo.cjs']);
   for (const f of DATA_FILES) assert.ok(fs.existsSync(path.join(DATA_SRC, f + '.js')));
 });
 

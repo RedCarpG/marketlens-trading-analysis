@@ -35,6 +35,7 @@ powershell -File tools\autostart.ps1 install
 | `GET /api/etoro/positions?symbol=` | 我的当前持仓（含浮动盈亏、止损止盈）；给了 symbol 只返回该品种 |
 | `GET /api/events/calendar` | 经济日历与 BLS 最新官方数据，见下文“经济日历与新闻” |
 | `GET /api/events/news?topic=&lang=` | 新闻，`topic` 为 gold / btc / macro，`lang` 为 zh / en |
+| `GET /api/cftc?code=` | CFTC 每周持仓报告里“管理基金”的多、空和总未平仓，最近 110 期；`code` 是 6 位合约代码（COMEX 黄金期货 `088691`），见下文“CFTC 每周持仓” |
 | `GET /api/cirra/status` | 桌宠 Cirra 开没开、常驻预警看哪些（`watch`）、页面要不要显示“让 Cirra 分析”（`ask`），见下文“桌宠 Cirra 播报” |
 | `POST /api/cirra/notify` | 让 Cirra 说一句 `{ text, kind }` |
 | `POST /api/ai/analyze` | 请 Cirra 的 AI 分析一次 `{ prompt, meta }`，回整段回答（只有这两个地址收 POST）；成功的带 meta 记到 `var/ai/log.jsonl` |
@@ -85,6 +86,16 @@ powershell -File tools\autostart.ps1 install
 - 返回：最近 8 天及以后的全部事件，更早的只返回高影响事件；每个来源的最后成功时间和错误（`sources`），页面据此显示覆盖情况。
 - 时区：美国的发布时间按美东时间换算成 UTC（夏令时由 Node 的 Intl 处理），测试覆盖了美欧夏令时错开的那几周。
 - 真机核对（2026-11-26）：本机运行时上表的来源都取到了，没设 `EVENTS_UA`。解析按各来源公开的格式编写并用样例测试（`tests/events.test.js`）；以后某个来源报错时看页面“事件”页顶部的来源状态，BLS 返回 403 时按 `.env.example` 设置 `EVENTS_UA`。
+
+## CFTC 每周持仓（server/cftc.js）
+
+美国商品期货交易委员会的持仓报告（Commitments of Traders，分类版、只含期货），公开数据，不需要密钥。
+
+- 来源：`publicreporting.cftc.gov/resource/72hh-3qpy.json`（Socrata 接口），按合约代码取最近 110 期，只要报告日期、合约名、总未平仓、管理基金（Managed Money）的多和空。代理只访问这一个地址；`code` 只收 6 位数字或大写字母。
+- 每一期是周二收盘时的持仓，通常周五下午（美东）公布，节假日那周会晚。
+- 返回 `{ code, name, units, at, rows: [{ ts, oi, long, short }], err? }`，`ts` 是那一期的日期（UTC 零点），旧的在前。
+- 缓存：存在 `var/cftc/<代码>.json`（`.env` 的 `CFTC_DIR` 可改位置），6 小时内不重取；取不到时回存着的并带 `err`，10 分钟后再试；一期都没有又取不到回 502。
+- 页面在分析页“期货持仓”一块里用（SPEC 3.3.19）。真机核对（2026-11-27）：黄金 088691 取到 110 期，最新一期 11 月 17 日。
 
 ## 桌宠 Cirra 播报（server/cirra.js）
 
