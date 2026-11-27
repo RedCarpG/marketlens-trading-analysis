@@ -158,13 +158,22 @@ function regOverlays() {
     },
   ]);
   /* 箭头：看多在最低价下方向上，看空在最高价上方向下 */
-  ov('fbArrow', 2, ({ overlay, coordinates }) => {
+  /* 字：箭头挨得太近时字会叠在一起读不出来，所以从最新的往回排，和已经留下字的箭头压到一起的就只画三角、不写字
+     （row 是不比它旧的箭头，新的在前，最后一个是它自己；按字的实际位置算：多头的字在最低价下面，空头的在最高价上面）。
+     放大以后隔得开了字会回来；写了什么在“近期信号”列表和悬停卡里都有 */
+  ov('fbArrow', 2, ({ overlay, coordinates, xAxis, yAxis }) => {
     const e = overlay.extendData,
       { x, y } = coordinates[0],
       s = e.dir > 0 ? 1 : -1,
       t = y + 5 * s,
-      b = y + 13 * s;
-    return [
+      b = y + 13 * s,
+      kept = [];
+    for (const q of e.row || []) {
+      const qy = yAxis.convertToPixel(q.px) + (q.dir > 0 ? 22 : -22),
+        r = { q, x: xAxis.convertToPixel(q.i), y: qy, w: q.tw };
+      if (kept.every(k => Math.abs(k.x - r.x) >= (k.w + r.w) / 2 + 6 || Math.abs(k.y - r.y) >= 18)) kept.push(r);
+    }
+    const fg = [
       {
         type: 'polygon',
         attrs: {
@@ -176,13 +185,15 @@ function regOverlays() {
         },
         styles: { style: 'fill', color: e.color },
       },
-      {
+    ];
+    if (!e.row || kept.some(k => k.q === e.row[e.row.length - 1]))
+      fg.push({
         type: 'text',
         attrs: { x, y: b + 2 * s, text: e.text, align: 'center', baseline: s > 0 ? 'top' : 'bottom' },
         styles: { ...TXT, size: 12, color: e.tc || e.color },
         ignoreEvent: true,
-      },
-    ];
+      });
+    return fg;
   });
   /* 区间：两个价格之间的半透明带 */
   ov('fbZone', 3, ({ overlay, coordinates, bounding }) => {
@@ -504,7 +515,7 @@ function regOverlays() {
       { type: 'polygon', attrs: { coordinates: tri(x, y, e.buy) }, styles: { style: 'fill', color: e.color } },
     ];
   });
-  /* 右侧标签层：所有价位标签在此统一绘制。按 y 排序后上下推开至少 18px（先向下推、超出底部再向上收），被推开的用细线连回原价位。
+  /* 右侧标签层：所有价位标签在此统一绘制。按 y 排序后上下推开至少 18px（先向下推、超出底部再向上收；最下面 30px 留给经济事件的标签），被推开的用细线连回原价位。
    右侧面板展开时价格轴左移 RIN，标签跟着贴在价格轴左边（线条仍延伸到面板下面）。
    样式：plain=纯文字（半透明底），outline=空心框，fill=实心框 */
   ov('fbLabels', 2, ({ overlay, coordinates, bounding }) => {
@@ -520,7 +531,7 @@ function regOverlays() {
       l.ay = Math.max(l.y, i ? L[i - 1].ay + G : 8);
     });
     for (let i = L.length - 1; i >= 0; i--) {
-      const lim = i == L.length - 1 ? h - 8 : L[i + 1].ay - G;
+      const lim = i == L.length - 1 ? h - 30 : L[i + 1].ay - G;
       if (L[i].ay > lim) L[i].ay = lim;
     }
     const pad = { paddingLeft: 4, paddingRight: 4, paddingTop: 1, paddingBottom: 1, borderRadius: 3 };
@@ -560,6 +571,8 @@ const cssv = n => {
   const v = getComputedStyle(document.documentElement).getPropertyValue(n).trim();
   return /^#[0-9a-f]{3}$/i.test(v) ? '#' + [...v.slice(1)].map(c => c + c).join('') : v;
 };
+/* 画布上一段文字大约多宽（像素）：汉字按字号算，字母数字按 0.58 个字号。只用来判断箭头的字会不会互相压住 */
+const txtW = (t, size) => [...t].reduce((w, c) => w + (c.charCodeAt(0) > 255 ? size : size * 0.58), 0);
 /* 图上点击：交易/持仓/信号箭头可点击高亮；点在图上空白处取消高亮（拖动图表不算点击）。
    ovHit 记录刚点中图形的时间，让随后冒泡上来的 DOM click 不再当作“点空白” */
 let ovHit = 0,
@@ -616,12 +629,12 @@ function trMarks(t, open) {
   });
   lab(
     t.openRate,
-    `持仓 ${t.isBuy ? '多' : '空'} ${+t.units.toFixed(2)} @${f(t.openRate)}${t.pnl != null ? ' ' + money(t.pnl) : ''}`,
+    `${t.isBuy ? '多' : '空'} @${f(t.openRate)}${t.pnl != null ? ' ' + money(t.pnl) : ''}`,
     t.pnl == null ? (t.isBuy ? TB : TS) : t.pnl >= 0 ? U : D
   );
   [
-    [t.sl, '我的止损', 'SL', D],
-    [t.tp, '我的止盈', 'TP', U],
+    [t.sl, '止损', 'SL', D],
+    [t.tp, '止盈', 'TP', U],
   ].forEach(([v, n, tag, c]) => {
     if (v > 0 && Math.abs(v - now) / now < 0.3) {
       items.push({
@@ -637,7 +650,7 @@ function trMarks(t, open) {
         points: [{ timestamp: a, value: v }],
         extendData: { color: c, size: 1.5, dash: 'dashdot', ray: 1, tag },
       });
-      lab(v, `${n} ${f(v)} · ≈${money(pAt(v))}`, c);
+      lab(v, `${n} ${f(v)} ≈${money(pAt(v))}`, c);
     }
   });
   return { items, labs };
@@ -663,7 +676,9 @@ function drawMarks(m) {
       x = m.t.a.a,
       M = mainLv(m.L, now, x, tf),
       pm = [];
-    /* 价位标注：支撑阻力（挡回≥3次的画成区间）+ 当前及更大周期的前高/前低；同侧相距 0.3 ATR 内的合并成一条，标签拼在一起 */
+    /* 价位标注：支撑阻力（挡回≥3次的画成区间）+ 当前及更大周期的前高/前低；同侧相距 0.3 ATR 内的合并成一条。
+       标签写短（2026-11-27）：只写最大的那个周期，挡回次数写成“×N”，放得进最新K线右边的空白里、不盖住最新的K线；
+       参与的全部周期在面板的“关键价位”里 */
     if (MK.sr)
       M.sup.concat(M.res).forEach(l =>
         pm.push({
@@ -672,7 +687,8 @@ function drawMarks(m) {
           big: TFW[l.top] >= 5,
           low: TFW[l.top] < TFW[tf],
           zone: l.touch >= 3 ? [Math.min(l.zlo, l.p - x * 0.15), Math.max(l.zhi, l.p + x * 0.15)] : null,
-          t: `${l.tfs.join('·')} ${l.side > 0 ? '支撑' : '阻力'}${l.touch >= 3 ? ` 挡回${l.touch}次` : ''}`,
+          tf: l.top,
+          t: `${l.top} ${l.side > 0 ? '支撑' : '阻力'}${l.touch >= 3 ? '×' + l.touch : ''}`,
         })
       );
     if (MK.hl)
@@ -691,29 +707,14 @@ function drawMarks(m) {
         g.zone = g.zone || q.zone;
       } else mg.push({ ...q, m: [q] });
     }
-    /* 合并后各部分价格相同时只写一次价格，不同时各写各的（前高/前低是精确的K线高低点，支撑阻力是合并后的代表价） */
+    /* 合并后的标签只写一条：有支撑阻力时写其中周期最大的那条（同一处还有前高/前低就加 ◆ 前缀），只有前高/前低时写周期最大的那个 */
     mg.forEach(g => {
       const hl = g.m.filter(q => q.hl),
         sr = g.m.filter(q => !q.hl),
         col = g.side > 0 ? U : D,
-        parts = [
-          ...(hl.length
-            ? [
-                {
-                  t: `◆${hl
-                    .map(q => q.hl)
-                    .sort((a, b) => TFW[b] - TFW[a])
-                    .join('·')}${hl[0].t}`,
-                  p: hl[0].p,
-                },
-              ]
-            : []),
-          ...sr.map(q => ({ t: q.t, p: q.p })),
-        ],
-        same = parts.every(q => f(q.p) == f(parts[0].p)),
-        text = same
-          ? parts.map(q => q.t).join(' · ') + ' ' + f(parts[0].p)
-          : parts.map(q => `${q.t} ${f(q.p)}`).join(' · '),
+        best = sr.length ? sr.reduce((a, q) => (TFW[q.tf] > TFW[a.tf] ? q : a)) : null,
+        top = hl.length ? hl.reduce((a, q) => (TFW[q.hl] > TFW[a.hl] ? q : a)) : null,
+        text = best ? `${top ? '◆' : ''}${best.t} ${f(best.p)}` : `◆${top.hl}${top.t} ${f(top.p)}`,
         o = hl.length ? hl.reduce((a, q) => (q.ts < a.ts ? q : a)) : null,
         ot = o && (snapTs(o.ts) || bars[0].timestamp);
       if (g.zone)
@@ -757,7 +758,12 @@ function drawMarks(m) {
         o.near = o.near || near;
         grp.set(k, o);
       }
-      [...grp.values()].slice(-8).forEach(({ g, b, px, near, ns }) =>
+      const arr = [...grp.values()].slice(-8);
+      arr.forEach(o => {
+        o.text = o.ns.join('+') + (o.near ? `·${o.g.dir > 0 ? '支撑' : '阻力'}` : '');
+        o.tw = txtW(o.text, 12);
+      });
+      arr.forEach(({ g, b, px, text }) =>
         items.push({
           name: 'fbArrow',
           points: [{ timestamp: b.timestamp, value: px }],
@@ -766,7 +772,11 @@ function drawMarks(m) {
             dir: g.dir,
             color: g.dir > 0 ? U : D,
             tc: MU,
-            text: ns.join('+') + (near ? `·${g.dir > 0 ? '支撑' : '阻力'}` : ''),
+            text,
+            row: arr
+              .filter(q => q.g.i > g.i || q.g === g)
+              .sort((u, v) => v.g.i - u.g.i || (v.g === g ? -1 : 1))
+              .map(q => ({ i: q.g.i, px: q.px, dir: q.g.dir, tw: q.tw })),
           },
         })
       );

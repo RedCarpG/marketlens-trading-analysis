@@ -373,8 +373,9 @@ function axisCls() {
 /* 价格轴左移的同时（CSS 过渡 0.34 秒），右侧价位标签层按 RIN 让到价格轴左边：
    正停在最新K线处时逐帧调整图表库的右侧留白，最新K线跟着价格轴移动；在看历史行情时不挪画面，面板下面的K线透过半透明底仍看得到，
    只逐帧重绘让标签跟上（右侧留白在下次换数据时按当前宽度设好，见 show） */
-/* RGAP：最新K线右边留出的空白（像素），这块“还没走出来”的区域另铺底色，见 nowMark */
-const RGAP = 80;
+/* RGAP：最新K线右边留出的空白（像素），这块“还没走出来”的区域另铺底色，见 nowMark。
+   右侧的价位标签（marks.js 的 fbLabels）就放在这块空白里，不盖住最新的K线，所以留得比较宽；窄屏放不下那么多，留窄一些 */
+const RGAP = matchMedia('(min-width:901px)').matches ? 164 : 96;
 let RIN = 0,
   rinAnim = 0;
 function setRin(to) {
