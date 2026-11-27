@@ -91,7 +91,7 @@ powershell -File tools\autostart.ps1 install
 用户的桌宠 Cirra（仓库 cirra-deskpet）开着时在本机事件端口收 `POST /notify`；端口和每次启动生成的 token 写在 `~/.cirra/endpoint.json`（`.env` 的 `CIRRA_ENDPOINT_FILE` 可改，和 Cirra 用同一个变量名）。她故意不让网页直接调，所以页面的预警交给代理，由代理转给她。
 
 - 发送：每次重读 endpoint 文件，带 `X-Cirra-Token`、`Content-Type: application/json` 发到 `http://127.0.0.1:<端口>/notify`，请求体 `{ text, emotion, source: "market", kind }`（text 压成一行、截到 200 字；不传 title）。401 时重读一次文件再试（她刚重启）；文件不在或连不上 = 她没开，回 `{ ok: false, reason: "Cirra 没开" }`，不报错。每分钟最多 8 条，超出的不发。
-- `POST /api/cirra/notify`：必须带本机页面的 `Origin`（外站网页发不了：不回 CORS 头，预检过不去）、`Content-Type: application/json`、请求体 ≤ 4 KB；`kind` 为 `lv`（价位）/ `sc`（情景触发）/ `scx`（情景失效、到目标）/ `dn`（接近我的止损）/ `up`（接近我的止盈）/ `ev`（经济事件）/ `ck`、`cko`（开仓体检：有守则没守 / 都守住了）/ `test`（试一下），表情由代理按 kind 定，不收页面传来的表情。她没开时也回 200（`ok: false`）。
+- `POST /api/cirra/notify`：必须带本机页面的 `Origin`（外站网页发不了：不回 CORS 头，预检过不去）、`Content-Type: application/json`、请求体 ≤ 4 KB；`kind` 为 `lv`（价位）/ `sc`（情景触发）/ `scx`（情景失效、到目标）/ `dn`（接近我的止损）/ `up`（接近我的止盈）/ `ev`（经济事件）/ `ml`（到了我画的线）/ `ck`、`cko`（开仓体检：有守则没守 / 都守住了）/ `test`（试一下），表情由代理按 kind 定，不收页面传来的表情。她没开时也回 200（`ok: false`）。
 - 常驻预警（server/watch.js）：**默认不开**（2026-11-27 起）。这件事现在由 Cirra 的插件“MarketLens 行情”自己做，代理没开她也能看；两边都开会说两遍。不用那个插件时在 `.env` 写 `CIRRA_WATCH=gold`（或自己列品种）打开：页面关着时按页面同一套规则看价位和情景，每 5 分钟取一次；她没开时不取数；不读持仓。设计见 docs/CIRRA.md §9。
 - `GET /api/cirra/status`：对她的端口发一次 GET，她回 405（只收 POST）即在线；不带 token，不会让她说话。
 - 她那边：要在 Cirra 的设置【扩展】里打开插件“MarketLens 行情”（cirra-plugins 的 `plugins/marketlens`），带 `source: "market"` 的话才有人接；**插件没开时她照样回 204、但不说**，代理和页面看不出区别（页面仍显示“已交给 Cirra”）。插件开着时，推来的话进她的通知模组，来源叫“行情”（免打扰、专注时段、全屏时先攒着，排着几条时合成一句，提醒方式可选说出来 / 只显示 / 只记录 / 关）。

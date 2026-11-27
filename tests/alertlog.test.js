@@ -74,9 +74,9 @@ test('lineCheck：进入 ±0.15 ATR 提醒一次，离开 0.5 ATR 后再到才�
   assert.deepEqual(Object.keys(arm).sort(), ['ml|100.00', 'ml|110.00', 'ml|120.00']);
 });
 
-test('lineText：弹窗一句、给 Cirra 念的一句，交给她时归到关键价位；话里只有事实', () => {
+test('lineText：弹窗一句、给 Cirra 念的一句，交给她时用自己的类型 ml（不和关键价位混，免得被她的插件当成重复丢掉）；话里只有事实', () => {
   const s = plain(lineText({ id: '2650.00', p: 2650 }, { sym: 'GC', name: '黄金期货 GC', T: '1h', px: 2651.234, dp: 2 }));
-  assert.deepEqual(s, { text: 'GC 1h 价格 2651.23 到了我画的线 2650.00', say: '黄金期货 GC 到了你画的线 2650.00 附近', kind: 'ml', ck: 'lv' });
+  assert.deepEqual(s, { text: 'GC 1h 价格 2651.23 到了我画的线 2650.00', say: '黄金期货 GC 到了你画的线 2650.00 附近', kind: 'ml', ck: 'ml' });
   assert.doesNotMatch(s.text + s.say, /建议|买|卖|会涨|会跌/);
 });
 

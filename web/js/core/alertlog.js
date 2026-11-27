@@ -37,7 +37,9 @@ function lineText(l, { sym, name, T, px, dp = 2 }) {
     text: `${sym} ${T} 价格 ${f(px)} 到了我画的线 ${f(l.p)}`,
     say: `${name} 到了你画的线 ${f(l.p)} 附近`,
     kind: 'ml',
-    ck: 'lv',
+    /* 交给 Cirra 的类型用自己的 ml，不和算出来的关键价位（lv）混：她的插件自己盯着同一个品种时会把页面转来的 lv 丢掉
+       （免得说两遍），而你画的线只有页面知道，丢了就没人说了。页面上仍归在“关键价位”那个勾选里（cirra.js 的 CIG） */
+    ck: 'ml',
   };
 }
 

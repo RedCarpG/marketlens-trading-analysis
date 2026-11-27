@@ -9,7 +9,8 @@ let CI = { on: 1, lv: 0, sc: 0, sl: 1, ev: 1, ck: 0, ...LS.get('cirra', {}) },
   CS = null,
   CL = null;
 /* 交给代理的类型（决定她的表情）→ 属于哪个勾选 */
-const CIG = { lv: 'lv', sc: 'sc', scx: 'sc', dn: 'sl', up: 'sl', ev: 'ev', ck: 'ck', cko: 'ck' };
+/* ml = 我画的线：和关键价位用同一个勾选，但类型分开（见 core/alertlog.js 的 lineText） */
+const CIG = { lv: 'lv', ml: 'lv', sc: 'sc', scx: 'sc', dn: 'sl', up: 'sl', ev: 'ev', ck: 'ck', cko: 'ck' };
 /* 品种念出来的名字：自选列表里“ · ”前面那段（如“黄金 GOLD”） */
 const ciName = () => cur.name.split(' · ')[0];
 async function ciPost(text, kind) {
@@ -29,8 +30,9 @@ async function ciPost(text, kind) {
   ciRedraw();
 }
 /* 当前品种和周期的价位、情景由代理的常驻预警负责时（server/watch.js），页面不再转发，免得说两遍 */
+/* 只挡代理自己算得出来的那几类；我画的线（ml）代理不知道，照常转 */
 const ciByProxy = kind =>
-  (CIG[kind] == 'lv' || CIG[kind] == 'sc') &&
+  (kind == 'lv' || kind == 'sc' || kind == 'scx') &&
   !!(CS && CS.watch) &&
   CS.watch.some(w => w.src == cur.src && w.symbol == ssym(cur) && w.tf == tf);
 /* alFire 调用：kind 为上面 CIG 里的类型 */
