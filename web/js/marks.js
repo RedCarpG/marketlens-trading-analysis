@@ -448,11 +448,33 @@ function regOverlays() {
           { x: x - 6, y: y - 12 },
           { x: x + 6, y: y - 12 },
         ];
-  ov('fbTrade', 3, ({ overlay, coordinates, barSpace }) => {
+  /* 盈亏标签：日线这类大周期上，几笔交易挤在相邻的几根K线里，标签会叠成一团。和箭头的字一样从最新的一笔往回排，
+     标签和已经留下的压到一起的就不写（连线、三角、圆照画）。all 是这一批交易的平仓位置和标签宽度（新的在前），
+     同一帧里各笔交易算出来的结果一样，所以按画面位置记一次（trKeep） */
+  ov('fbTrade', 3, ({ overlay, coordinates, barSpace, xAxis, yAxis }) => {
     const e = overlay.extendData,
       [a, b] = coordinates,
       hb = ((barSpace && barSpace.bar) || 6) / 2;
-    return [
+    let show = true;
+    if (e.all) {
+      const key = [
+        e.all.length,
+        e.all[0].id,
+        xAxis.convertToPixel(0),
+        barSpace.bar,
+        yAxis.convertToPixel(e.all[0].v),
+      ].join('|');
+      if (trKeep.key !== key) {
+        const kept = [];
+        for (const q of e.all) {
+          const r = { id: q.id, x: xAxis.convertToPixel(q.i) + 8, y: yAxis.convertToPixel(q.v), w: q.tw };
+          if (kept.every(k => r.x + r.w < k.x || k.x + k.w < r.x || Math.abs(k.y - r.y) >= 17)) kept.push(r);
+        }
+        trKeep = { key, ids: new Set(kept.map(k => k.id)) };
+      }
+      show = trKeep.ids.has(e.id);
+    }
+    const fg = [
       /* 开平仓之间的时间 × 价格范围铺一层很淡的盈亏色 */
       {
         type: 'rect',
@@ -473,7 +495,9 @@ function regOverlays() {
         attrs: { x: b.x, y: b.y, r: 4 },
         styles: { style: 'stroke', color: e.pl, borderColor: e.pl, borderSize: 2 },
       },
-      {
+    ];
+    if (show)
+      fg.push({
         type: 'text',
         attrs: { x: b.x + 8, y: b.y, text: e.text, align: 'left', baseline: 'middle' },
         styles: {
@@ -487,8 +511,8 @@ function regOverlays() {
           paddingTop: 1,
           paddingBottom: 1,
         },
-      },
-    ];
+      });
+    return fg;
   });
   /* 我的持仓：点依次为 开仓 / 当前价；开仓价到当前价之间从开仓K线起铺一层盈亏色（浮盈涨色、浮亏跌色），开仓三角 + 粗实线延伸到右边缘（标签在标签层） */
   ov('fbPos', 3, ({ overlay, coordinates, bounding }) => {
@@ -656,7 +680,19 @@ function trMarks(t, open) {
   return { items, labs };
 }
 let ovSig = '',
-  lastM = null;
+  lastM = null,
+  trKeep = { key: '', ids: new Set() };
+/* 时间落在第几根K线上（没有正好对上的取它前面那根） */
+function barIdx(ts) {
+  let lo = 0,
+    hi = bars.length - 1;
+  while (lo < hi) {
+    const m = (lo + hi + 1) >> 1;
+    if (bars[m].timestamp <= ts) lo = m;
+    else hi = m - 1;
+  }
+  return lo;
+}
 function drawMarks(m) {
   lastM = m;
   sessMark();
@@ -808,7 +844,20 @@ function drawMarks(m) {
         });
     /* 我的交易：最近 60 笔已平仓（开平仓都在已加载数据范围内的），以及当前持仓和它们的止损/止盈 */
     if (MK.tr && TR && TR.sym === cur.sym) {
-      TR.closed.slice(-60).forEach(t => items.push(...trMarks(t).items));
+      const cl = TR.closed
+          .slice(-60)
+          .map(t => trMarks(t).items[0])
+          .filter(Boolean),
+        all = cl
+          .map((it, k) => ({
+            id: k,
+            i: barIdx(it.points[1].timestamp),
+            v: it.points[1].value,
+            tw: txtW(it.extendData.text, 11) + 8,
+          }))
+          .reverse();
+      cl.forEach((it, k) => Object.assign(it.extendData, { id: k, all }));
+      items.push(...cl);
       TR.open.forEach(p => {
         const r = trMarks(p, 1);
         items.push(...r.items);
