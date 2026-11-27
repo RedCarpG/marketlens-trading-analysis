@@ -474,6 +474,34 @@ function regOverlays() {
       }
       show = trKeep.ids.has(e.id);
     }
+    /* 开仓和平仓落在同一根或紧挨着的K线上（大周期上看日内的交易）：画不出连线，三角和圆还会叠在一起，
+       只画一个按盈亏着色的实心圆点；放大到两头分得开了再画完整的 */
+    if (Math.abs(b.x - a.x) < 12) {
+      const dot = [
+        {
+          type: 'circle',
+          attrs: { x: b.x, y: b.y, r: 4 },
+          styles: { style: 'stroke_fill', color: e.pl, borderColor: e.bg || e.pl, borderSize: 1 },
+        },
+      ];
+      if (show)
+        dot.push({
+          type: 'text',
+          attrs: { x: b.x + 8, y: b.y, text: e.text, align: 'left', baseline: 'middle' },
+          styles: {
+            ...TXT,
+            size: 11,
+            color: '#fff',
+            backgroundColor: e.pl,
+            borderRadius: 3,
+            paddingLeft: 3,
+            paddingRight: 3,
+            paddingTop: 1,
+            paddingBottom: 1,
+          },
+        });
+      return dot;
+    }
     const fg = [
       /* 开平仓之间的时间 × 价格范围铺一层很淡的盈亏色 */
       {
