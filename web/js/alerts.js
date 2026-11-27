@@ -35,7 +35,6 @@ function evalAlerts(m) {
   if (!AL.on || !m || cur.src == 'csv' || !bars.length) return;
   const now = bars[bars.length - 1].close,
     x = m.t.a.a,
-    f = v => v.toFixed(cur.p),
     key = cur.sym + '|' + tf;
   if (alKey !== key) {
     alKey = key;
@@ -55,26 +54,14 @@ function evalAlerts(m) {
       const s = lineText(l, { sym: cur.sym, name: ciName(), T: tf, px: now, dp: cur.p });
       alFire(s.text, s.kind, s.say, s.ck, { ty: 'ml', lp: l.p, atr: x });
     });
-  /* 我的止损/止盈：进入 0.5 ATR 提醒，离开 1 ATR 后重新布防 */
+  /* 我的止损/止盈：进入 0.5 ATR 提醒，离开 1 ATR 后重新布防。判定和句子与代理的持仓看守共用（core/alertrules.js）；
+     “触及约多少钱”只加在页面的弹窗里，交给 Cirra 的那句没有金额 */
   if (AL.sl && TR && TR.sym === cur.sym)
-    TR.open.forEach(p =>
-      [
-        [p.sl, '止损'],
-        [p.tp, '止盈'],
-      ].forEach(([v, n]) => {
-        if (!(v > 0) || Math.abs(v - now) / now > 0.3) return;
-        const d = Math.abs(now - v),
-          pl = (v - p.openRate) * (p.isBuy ? 1 : -1) * p.units;
-        alArmCheck(
-          'sl|' + p.id + '|' + n,
-          d <= x * 0.5,
-          d >= x,
-          `${cur.sym} 价格 ${f(now)} 接近我的${n} ${f(v)}（相距 ${(d / x).toFixed(1)} ATR，触及约 ${money(pl)}）`,
-          n == '止损' ? 'dn' : 'up',
-          `${ciName()} 离你的${n} ${f(v)} 只差 ${(d / x).toFixed(1)} 个 ATR`
-        );
-      })
-    );
+    slCheck(TR.open, now, x, alArm).forEach(h => {
+      const pl = (h.v - h.p.openRate) * (h.p.isBuy ? 1 : -1) * h.p.units,
+        s = slText(h, { sym: cur.sym, name: ciName(), px: now, x, dp: cur.p, extra: `触及约 ${money(pl)}` });
+      alFire(s.text, s.kind, s.say, s.ck);
+    });
 }
 /* 发出提醒：页面右下角弹出提示 + 系统通知（已授权时）+ 记入预警记录 + 交给桌宠 Cirra（勾选了这一类时，见 cirra.js）；
    不在预警页时“预警”标签计未读。say 为给 Cirra 念的短句（没有时念 text），ck 为交给她的类型（决定表情，默认同 kind）。

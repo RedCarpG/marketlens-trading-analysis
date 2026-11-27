@@ -226,6 +226,8 @@ test('代理 /api/cirra/notify：只收本机页面的 JSON；表情按 kind 定
     CIRRA_ENDPOINT_FILE: file,
     EVENTS_DIR: path.join(d, 'ev'),
     CIRRA_WATCH: 'off', // 测试里不让常驻预警去取行情
+    CIRRA_POS: 'off', // 也不让持仓看守去取持仓
+    CIRRA_POS_FILE: path.join(d, 'pos.json'),
     AI_DAILY: '2',
     AI_LOG_DIR: path.join(d, 'ai'),
   });
@@ -251,6 +253,14 @@ test('代理 /api/cirra/notify：只收本机页面的 JSON；表情按 kind 定
     /* 状态：她在、常驻预警看哪些；“让 Cirra 分析”默认收起（没写 CIRRA_ASK） */
     const st = (await req(port, 'GET', '/api/cirra/status')).json;
     assert.deepEqual([st.running, st.file, Array.isArray(st.watch), st.ask], [true, file, true, false]);
+    /* 持仓看守的开关：默认两样都不说；只收本机页面的；存下来，状态里看得到 */
+    assert.deepEqual(st.pos, { on: false, symbols: [], prefs: { sl: 0, ck: 0 }, last: null, err: null });
+    const prefs = (headers, body) => req(port, 'POST', '/api/cirra/prefs', { headers, body });
+    assert.equal((await prefs(J, '{"sl":1}')).status, 403);
+    assert.equal((await prefs({ ...J, origin: O }, '[1]')).status, 400);
+    const pf = await prefs({ ...J, origin: O }, '{"sl":1,"ck":0,"x":"y"}');
+    assert.deepEqual([pf.status, pf.json.ok, pf.json.pos.prefs], [200, true, { sl: 1, ck: 0 }]);
+    assert.deepEqual((await req(port, 'GET', '/api/cirra/status')).json.pos.prefs, { sl: 1, ck: 0 });
     assert.equal((await req(port, 'POST', '/api/candles', { headers: { ...J, origin: O }, body: '{}' })).status, 405);
     /* AI 分析：转给她的 /ask；她拒绝（模块关着）的不占次数；同一份 15 分钟内用上次的；每天上限 AI_DAILY=2 */
     const ai = (prompt, headers = { ...J, origin: O }) =>

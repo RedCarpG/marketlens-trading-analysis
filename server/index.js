@@ -12,6 +12,7 @@
    GET /api/events/news?topic=&lang=                    → 新闻（RSS，按主题和语言）
    GET /api/cirra/status                                → 桌宠 Cirra 开没开（见 cirra.js）
    POST /api/cirra/notify  { text, kind }               → 让 Cirra 把一条预警说出来
+   POST /api/cirra/prefs   { sl, ck }                   → 持仓看守说不说止损 / 止盈、开仓体检（它自己的两个开关，见 poswatch.js）
    GET  /api/ai/log?sym=&tf=                            → AI 分析的记录（页面按之后的K线打分）
    POST /api/ai/analyze    { prompt, meta }                   → 请 Cirra 的 AI 分析一次（提问 + 分析包），回整段回答（只有这两个地址收 POST）
    密钥只从项目根目录 .env 读取，不发给前端、不写日志。 */
@@ -26,6 +27,7 @@ const { createCirra, KIND } = require('./cirra');
 const { createWatch, parseWatch } = require('./watch');
 const { createAiLog, parseBias, cleanMeta } = require('./ailog');
 const { createJournal } = require('./journal');
+const { createPosWatch, parsePos } = require('./poswatch');
 
 const ROOT = path.resolve(__dirname, '..');
 function loadEnv(f) {
@@ -170,8 +172,21 @@ async function aiAnalyze(prompt, meta) {
 }
 /* 交易日记与我的守则：只存在本机 var/journal.json（JOURNAL_FILE 可改位置），见 journal.js */
 const journal = createJournal(E.JOURNAL_FILE || path.join(ROOT, 'var', 'journal.json'));
+/* 持仓看守：页面关着时也看我的止损 / 止盈、新开仓时对照守则，交给 Cirra（见 poswatch.js）。
+   说不说是它自己的两个开关，在页面预警页勾（POST /api/cirra/prefs），默认都不说；CIRRA_POS=off 整个不看 */
+const posw = createPosWatch({
+  list: parsePos(E.CIRRA_POS, { keys: KEYS, tkeys: TKEYS }),
+  positions: () => trader.open(),
+  closed: () => trader.closed(364),
+  resolve: s => client.resolve(s),
+  candles: (s, tf, n) => client.candles(s, tf, n),
+  calendar: () => events.calendar(),
+  rules: () => journal.get().rules,
+  cirra,
+  file: E.CIRRA_POS_FILE || path.join(ROOT, 'var', 'poswatch.json'),
+});
 /* 收 POST 的地址和请求体上限 */
-const POSTS = { '/api/cirra/notify': 4096, '/api/ai/analyze': 65536, '/api/journal': 16384 };
+const POSTS = { '/api/cirra/notify': 4096, '/api/cirra/prefs': 256, '/api/ai/analyze': 65536, '/api/journal': 16384 };
 /* 读请求体：超过 max 字节返回 null（多出来的读掉丢弃，好正常回 413） */
 function readBody(req, max) {
   return new Promise(resolve => {
@@ -208,7 +223,7 @@ const server = http.createServer(async (req, res) => {
   /* 桌宠 Cirra 与 AI 分析。POST 必须带本机页面的 Origin、Content-Type 为 JSON（外站网页发不了：不回 CORS 头，预检过不去）、请求体不超过 POSTS 的上限；
      预警的 kind 只认预设的几种，表情按 kind 定，不收页面传来的表情。她没开时也回 200（ok: false），页面只显示状态。
      watch：常驻预警负责的品种和周期；ask：页面要不要显示“让 Cirra 分析” */
-  if (u.pathname === '/api/cirra/status') return json(res, 200, { ...(await cirra.status()), file: cirra.file, watch: watch.list(), ask: ASK });
+  if (u.pathname === '/api/cirra/status') return json(res, 200, { ...(await cirra.status()), file: cirra.file, watch: watch.list(), pos: posw.status(), ask: ASK });
   if (isPost) {
     if (!req.headers.origin || !ORIGINS.has(req.headers.origin)) return json(res, 403, { error: 'forbidden' });
     if (!/^application\/json\b/i.test(req.headers['content-type'] || '')) return json(res, 415, { error: '只收 application/json' });
@@ -231,6 +246,11 @@ const server = http.createServer(async (req, res) => {
         console.warn(`[journal] ${e.message}`);
         return json(res, 500, { error: e.message });
       }
+    }
+    /* 持仓看守的两个开关：{ sl, ck }，在页面预警页的“页面关着也说”里勾 */
+    if (u.pathname === '/api/cirra/prefs') {
+      if (!b || typeof b != 'object' || Array.isArray(b)) return json(res, 400, { error: '须为 { sl, ck }' });
+      return json(res, 200, { ok: true, pos: posw.setPrefs({ sl: b.sl, ck: b.ck }) });
     }
     if (!b || typeof b.text != 'string' || !b.text.trim() || !Object.hasOwn(KIND, b.kind)) return json(res, 400, { error: `须有 text，kind 须为 ${Object.keys(KIND).join('/')}` });
     const r = await cirra.send({ text: b.text, emotion: KIND[b.kind], kind: b.kind });
@@ -350,6 +370,9 @@ server.listen(PORT, HOST, () => {
   if (!TKEYS) console.warn('未配置 ETORO_TRADE_API_KEY / ETORO_TRADE_USER_KEY：不显示个人交易记录');
   const st = store.list();
   watch.start();
+  posw.start();
+  const ps = posw.status();
+  if (ps.on) console.log(`持仓看守：${ps.symbols.join('、')}（止损 / 止盈${ps.prefs.sl ? '说' : '不说'}，开仓体检${ps.prefs.ck ? '说' : '不说'}；在页面预警页的“页面关着也说”里改）`);
   console.log(`本地K线存储：${st.length ? st.map(s => `${s.instrumentId}/${s.interval} ${s.count}根`).join('，') : '暂无（打开页面后开始积累）'}`);
 });
 

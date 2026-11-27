@@ -90,7 +90,11 @@ Cirra 插件 1.1.0（2026-11-26，路线图第 2 步，在 X:\Project\Cirra\cirr
 
 第 5 步剩下的两项（2026-11-27，本机；main 先推送到了 7e9170c，这两项的改动还没提交）：新增 web/js/core/study.js（关键价位统计 lvStudy / lvReport / lvText；事件研究 evStudy / evReport / evText），加进了 core/files.js 的 FILES 和 web/index.html，对外接口 API 和包版本没动；tools/study.js 和 `npm run study`（levels / events 两个子命令，结果写到 var/study/）；回测面板跑完接着出关键价位统计（web/js/bt-worker.js、web/js/backtest-ui.js）；事件页“下一个重要事件”卡片多一句、下面多一块“公布以后一般动多少”（web/js/events.js 的 loadEvStudy，经代理另取 8000 根 Yahoo 1 小时K线）。结论：关键价位不比随便一条过去的收盘价更能挡（黄金日线 25 年 56% 对 58%，黄金前后两半、1 小时、比特币都一样；这个比法在随机游走上自己有 8 个点左右的偏差）；非农、CPI 公布后一小时左右的波幅是平常的一倍半左右，FOMC 3.8 倍（只有 7 次），方向没有规律。数字和做法在 docs/BACKTEST.md 第 18、19 节，页面在 SPEC 3.3.16。测试 tests/study.test.js，共 118 项通过；真实 GOLD 经代理在浏览器里核对了两处的数字，没有截图，主题和窄屏下的样子没看。路线图 §5 表里排好的步骤到此做完。
 
-下一步：用户在 Cirra 里更新并打开插件、验收（第 2、4 步）；在交易页定自己的守则，用真实交易看复盘面板（第 3 步）；第 5 步的验收。再往后的在 docs/ROADMAP.md §5 的“以后再看”（行情卡小窗、盘感训练、B3、B5、C2），还没排顺序。情景入场条件仍无优势，不再细调；GC数据（eToro Micro Gold期货拼接连续合约或另找GC源）以后再议。
+第 5 步剩下的两项已提交并推送（fd097b6，2026-11-27）。
+
+第 6 步（2026-11-27，改动还没提交）：代理的持仓看守 server/poswatch.js——页面关着也看黄金 GOLD 的持仓，离止损 / 止盈近了、新开一笔时交给 Cirra 说（一句话，不带金额）。止损止盈的判定和句子挪进 core/alertrules.js（slCheck / slText），页面的 evalAlerts 改用它；开仓体检用现成的 reviewTrade / checkRules / checkSay。它自己的两个开关存在 var/poswatch.json，在预警页“页面关着也说”里勾（POST /api/cirra/prefs），默认都不说、不说时不读持仓；某一类在代理那边开着时页面不再转发那一类（web/js/cirra.js 的 ciByProxy）。.env 多了 CIRRA_POS（不填 = 黄金，off = 不看）、CIRRA_POS_FILE。测试 tests/poswatch.test.js，共 125 项通过；用真的行情、日历、守则和持仓接口实际跑过（只把“说给 Cirra”换成记下来，另造两笔持仓让它开口）；本机代理已经重启成新代码，两个开关现在都是关的。还没验的：Cirra 真的开口、真实持仓走到止损附近、真实账户新开一笔。详见 SPEC 3.3.17。注意：tools\autostart.ps1 start 的输出不要接管道（`| Out-Null`），会一直等到代理退出。
+
+下一步：在预警页把“页面关着也说”里想要的勾上（第 6 步验收）；用户在 Cirra 里更新并打开插件、验收（第 2、4 步）；在交易页定自己的守则，用真实交易看复盘面板（第 3 步）；第 5 步的验收。再往后的排成了路线图第 6–10 步（2026-11-27，docs/ROADMAP.md §5）：6 止损止盈和开仓体检常驻（代理看持仓，做完）→ 7 相关品种 + 新闻去噪 → 8 行情卡小窗 → 9 CFTC 持仓 → 10 盘感训练；第 7 步不用等 Cirra 那边的验收。情景入场条件仍无优势，不再细调；GC数据（eToro Micro Gold期货拼接连续合约或另找GC源）以后再议。
 
 已定（2026-10-22）：先用eToro GOLD（黄金CFD），GC期货数据源以后再议。
 待定：Binance适配器是否需要验证；v0.3中未写入项目说明的内容（手动ChatGPT分析包、SQLite留痕）是否还要。（经济日历与新闻的真实联调已于 2026-11-26 通过；DATA_VALIDATION.md 已归档。）GitHub：当前仓库 https://github.com/RedCarpG/marketlens-trading-analysis（公开；2026-10-24 由 web-trading-MarketLens-app 改名；命名：全小写连字符，品牌名 + 用途；main），.env、server/node_modules、work/ 均未上传。

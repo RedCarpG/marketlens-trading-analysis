@@ -43,6 +43,33 @@ function alCheck(m, T, px, st, { lv = 1, sc = 1, dp = 2 } = {}) {
   }
   return out;
 }
+/* 持仓的止损 / 止盈（页面 alerts.js 和代理 server/poswatch.js 共用）：价格进入 0.5 个 ATR 提醒，离开 1 个 ATR 后重新布防。
+   open：持仓 [{ id, sl, tp }]（没设的为 0）；px 最新价；x ATR；arm 布防状态（原地更新）。
+   离现价超过 30% 的是 eToro 默认的远端止损，不看。返回这次该提醒的 [{ p 持仓, n '止损' | '止盈', v 那个价位, d 相距多少 }] */
+function slCheck(open, px, x, arm) {
+  const out = [];
+  for (const p of open)
+    for (const [v, n] of [
+      [p.sl, '止损'],
+      [p.tp, '止盈'],
+    ]) {
+      if (!(v > 0) || !(px > 0) || !(x > 0) || Math.abs(v - px) / px > 0.3) continue;
+      const d = Math.abs(px - v);
+      if (armStep(arm, 'sl|' + p.id + '|' + n, d <= x * 0.5, d >= x)) out.push({ p, n, v, d });
+    }
+  return out;
+}
+/* 那一条的文字。extra 是页面加在括号里的后半句（“触及约多少钱”）：金额只在页面的弹窗里，say 里没有，不交给 Cirra */
+function slText(h, { sym, name, px, x, dp = 2, extra = '' }) {
+  const f = v => v.toFixed(dp),
+    k = (h.d / x).toFixed(1);
+  return {
+    text: `${sym} 价格 ${f(px)} 接近我的${h.n} ${f(h.v)}（相距 ${k} ATR${extra ? '，' + extra : ''}）`,
+    say: `${name} 离你的${h.n} ${f(h.v)} 只差 ${k} 个 ATR`,
+    kind: h.n == '止损' ? 'dn' : 'up',
+    ck: h.n == '止损' ? 'dn' : 'up',
+  };
+}
 /* 一条提醒的文字：text 弹窗用，say 给 Cirra 念；kind 弹窗样式，ck 交给 Cirra 的类型。name 为念出来的品种名 */
 function alText(h, { sym, name, T, px, dp = 2 }) {
   const f = v => v.toFixed(dp);

@@ -31,10 +31,31 @@ async function ciPost(text, kind) {
 }
 /* 当前品种和周期的价位、情景由代理的常驻预警负责时（server/watch.js），页面不再转发，免得说两遍 */
 /* 只挡代理自己算得出来的那几类；我画的线（ml）代理不知道，照常转 */
+/* 持仓那两类（止损 / 止盈、开仓体检）：代理的持仓看守（server/poswatch.js）看着这个品种、并且那一类开着时也不转发，由它说——页面关着它也在。
+   它的两个开关存在代理那边（不是这个浏览器里），所以换个浏览器、关了页面都一样；没开的那一类页面照旧自己转 */
+const ciPosOn = k =>
+  !!(CS && CS.pos && CS.pos.on && CS.pos.prefs[k] && cur.srcs && CS.pos.symbols.includes(cur.srcs.etoro));
 const ciByProxy = kind =>
-  (kind == 'lv' || kind == 'sc' || kind == 'scx') &&
-  !!(CS && CS.watch) &&
-  CS.watch.some(w => w.src == cur.src && w.symbol == ssym(cur) && w.tf == tf);
+  ((kind == 'lv' || kind == 'sc' || kind == 'scx') &&
+    !!(CS && CS.watch) &&
+    CS.watch.some(w => w.src == cur.src && w.symbol == ssym(cur) && w.tf == tf)) ||
+  ((kind == 'dn' || kind == 'up') && ciPosOn('sl')) ||
+  ((kind == 'ck' || kind == 'cko') && ciPosOn('ck'));
+/* 改持仓看守的一个开关（k：sl / ck）：交给代理存着，回来的是它现在的状态 */
+async function ciPosSet(k, v) {
+  if (!CS || !CS.pos) return;
+  const want = { ...CS.pos.prefs, [k]: v ? 1 : 0 };
+  try {
+    const r = await fetch('/api/cirra/prefs', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(want),
+      }),
+      j = await r.json().catch(() => ({}));
+    if (j.ok && j.pos) CS = { ...CS, pos: j.pos };
+  } catch (_) {}
+  ciRedraw();
+}
 /* alFire 调用：kind 为上面 CIG 里的类型 */
 function cirraSay(text, kind) {
   if (!LOCAL || !CI.on || !CI[CIG[kind]] || ciByProxy(kind)) return;
@@ -54,6 +75,21 @@ if (LOCAL) setInterval(ciStatus, 30e3);
 function ciRedraw() {
   if (typeof pane == 'function' && pane('al')) morph(pane('al'), alPanel());
 }
+/* 持仓看守的一块：页面关着也说的两样（开关存在代理那边），它上一条交给她的话（那句话里没有金额） */
+function ciPosPanel() {
+  const P = CS && CS.pos;
+  if (!P || !P.on) return '';
+  const hm = t => new Date(t).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }),
+    opt = (k, t, s) =>
+      `<label class="opt"><span class="ot">${t}<small>${s}</small></span><input type="checkbox" class="sw" data-cip="${k}"${P.prefs[k] ? ' checked' : ''}></label>`,
+    last = P.last
+      ? `<div class="mu sm">它上一条 ${fmt('1d', P.last.t)} ${hm(P.last.t)}：${esc(P.last.text)}${P.last.ok ? '' : '（没说出去：' + esc(P.last.reason || '') + '）'}</div>`
+      : '';
+  return `<div class="alh ci"><div><b>页面关着也说</b><div class="mu sm">代理自己看 ${P.symbols.map(esc).join('、')} 的持仓</div>${last}</div></div>
+<div class="opts">${opt('sl', '我的止损 / 止盈', '离它不到 0.5 个 ATR 时说一声')}${opt('ck', '开仓体检', '新开一笔时说哪几条守则没守；只有守则的名字，不带金额')}</div>
+${P.err ? `<div class="note2">它上一次没看成：${esc(P.err)}</div>` : ''}
+${more('它怎么看的', `代理每分钟读一次你的持仓，开机就在，不用开着这个页面；Cirra 没开、或者上面两样都没勾时它不读。这两个开关存在代理那边，和上面“Cirra 播报”的勾选、预警总开关是分开的；勾上的那一类由它说，页面在这个品种上就不再转发，免得说两遍。离止损多近按 1 小时图的 ATR 算（页面的弹窗按你当时在看的周期算，所以不一定同时响）。新开的一笔只在开仓后半小时内说。交给 Cirra 的只有一句话，没有金额、数量和盈亏。`)}`;
+}
 /* 预警页里的一块：总开关、她在不在、四个勾选、“试一下” */
 function ciPanel() {
   if (!LOCAL) return '';
@@ -71,7 +107,8 @@ function ciPanel() {
 <button class="chip" id="cit" title="让 Cirra 说一句“MarketLens 连上了”">试一下</button>
 <button class="swb${CI.on ? ' on' : ''}" data-ci-on role="switch" aria-checked="${!!CI.on}" title="${CI.on ? '不让 Cirra 播报' : '让 Cirra 播报'}"></button></div>
 <div class="opts${CI.on ? '' : ' off'}">${opt('ev', '经济事件', '公布前 30 / 5 分钟、BLS 公布新数')}${opt('sl', '我的止损 / 止盈', '价格接近时')}${opt('ck', '开仓体检', '新开一笔时说哪几条守则没守；只有守则的名字，不带金额。默认不播')}${opt('lv', '关键价位', '较频繁，默认不播')}${opt('sc', '情景触发 / 失效', '默认不播')}</div>
-<div class="note2">预警开着时，勾选的几类除了弹窗也交给桌宠 Cirra 说出来（经本地代理转发，她没开时跳过）。她那边的免打扰、专注时段照常生效。${CS && CS.watch && CS.watch.length ? `<br>代理在后台看 ${CS.watch.map(w => esc(w.name) + ' ' + TFN[w.tf]).join('、')} 的价位和情景，页面关着也会说，不受上面两个勾选影响；页面在同一品种和周期上不再重复转发。` : ''}</div>`;
+<div class="note2">预警开着时，勾选的几类除了弹窗也交给桌宠 Cirra 说出来（经本地代理转发，她没开时跳过）。她那边的免打扰、专注时段照常生效。${CS && CS.watch && CS.watch.length ? `<br>代理在后台看 ${CS.watch.map(w => esc(w.name) + ' ' + TFN[w.tf]).join('、')} 的价位和情景，页面关着也会说，不受上面两个勾选影响；页面在同一品种和周期上不再重复转发。` : ''}</div>
+${ciPosPanel()}`;
 }
 function setCiOn(v) {
   CI.on = v ? 1 : 0;

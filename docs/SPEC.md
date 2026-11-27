@@ -375,6 +375,27 @@ K线图铺满整个窗口作为背景，周围的块半透明（背景模糊）�
 - 浏览器里核对过（真实 GOLD，经代理）：事件页那一句和那一块的数字与命令行一致（非农 13 次 1.4 倍、CPI 13 次 1.5 倍、FOMC 7 次 3.8 倍并标了“次数少”）；回测面板跑完后出现关键价位统计，三类线和四张分组表都有数，分组小表没有被撑宽；控制台没有新的报错。
 - **没有验证的**：没有截图（真实账户的页面不截图，模拟品种上没有另外看样子）；深色 / 浅色主题和窄屏下这两处的样子；别的品种（代码不挑品种）；不经代理的静态页面只确认了不显示事件研究这一条逻辑，没有实际打开看。
 
+### 3.3.17 持仓看守：页面关着也说止损止盈和开仓体检（2026-11-27，路线图第 6 步）
+
+以前“离我的止损 / 止盈近了”和“新开一笔时对照守则”只有页面开着才会说。现在代理自己看（server/poswatch.js），开机就在。
+
+- **为什么放在代理里**：常驻的事原则上归 Cirra 的插件（路线图 §6 第 2 条），这一项是例外——要读持仓，而账户数据不进插件（路线图 §3.5）。代理本来就有只读的交易密钥；交给 Cirra 的仍只是一句话。
+- **看什么**：每分钟读一次当前持仓（`/real/pnl`，和页面用的同一个只读接口），只看 `.env` 的 `CIRRA_POS` 里的品种（不填是黄金 GOLD；`off` 不看；格式 `名称|eToro 代码|小数位|货币`，分号隔开）。行情密钥和交易密钥都配了才有。别的品种的持仓不看。
+  - 止损 / 止盈：价格离它不到 0.5 个 ATR 说一次，离开 1 个 ATR 后重新布防；第一次见到时已经在里面的不说；离现价超过 30% 的是 eToro 默认的远端止损，不看。和页面是同一个函数（core/alertrules.js 的 `slCheck` / `slText`，页面的 `evalAlerts` 也改成用它）。价格用持仓接口带回来的现价，ATR 用 1 小时图的（一小时取一次K线）。句子：“黄金 GOLD 离你的止损 3636.15 只差 0.3 个 ATR”。
+  - 新开的一笔：第一次见到这个品种时只记下已有的；之后多出来的、开仓不到 30 分钟的才说。取这个品种六个周期的K线，按开仓那一刻重算（`reviewTrade`），逐条对照存着的守则（`checkRules`，日历和已平仓的交易也是代理自己取），用页面同一个函数出句子（`checkSay`）：“你新开的黄金 GOLD空单，有 2 条守则没守：开仓要设止损；同一品种同时最多 1 笔。”没勾守则时不重算、不说。
+- **说不说**：它自己的两个开关（止损 / 止盈、开仓体检），**存在代理那边**（`var/poswatch.json`），在预警页“Cirra 播报”下面的“页面关着也说”里勾，默认都不说。
+  - 不跟页面的预警总开关和“Cirra 播报”的勾选走：那些是每个浏览器各存一份的，页面关着或者换个浏览器就对不上（一开始做成了自动同步，两个浏览器开着会互相改，所以改成这样）。
+  - 两样都没开、或 Cirra 没开时，它不读持仓、不取K线。升级以后不会自己开口。
+  - 刚把“止损 / 止盈”打开时布防状态清掉重新建立基准，不会一打开就响。
+- **不说两遍**：某一类在代理那边开着、而且它看着当前品种时，页面不再把这一类转给 Cirra（`ciByProxy`：`dn` / `up` 看止损止盈那个开关，`ck` / `cko` 看体检那个）；页面自己的弹窗、系统通知、预警记录照旧。没开的那一类页面照旧按“Cirra 播报”的勾选自己转。
+- **不补说**：布防状态、见过的持仓存在状态文件里，代理重启不重复；隔了 5 分钟以上没看成（代理或 Cirra 关过）就重新建立基准。新开的一笔过了 30 分钟只记下不说（页面上是 6 小时内弹窗；她几小时后才说“你新开的”不合适）。
+- **不出代理的东西**：金额、数量、盈亏、持仓编号。交给 Cirra 的句子里只有品种名、止损 / 止盈的价位、守则的名字；状态文件里只有持仓编号、布防状态和最近 10 句话。页面弹窗里的“触及约多少钱”只在页面上（`slText` 的 `extra`）。
+- **和页面不完全一样的两点**：页面的 ATR 用你当时在看的周期，代理固定用 1 小时，所以页面的弹窗和她开口不一定同时；代理的话不进页面的预警记录（那份记录在浏览器本地），预警页那一块只显示它上一条说了什么。
+- 接口：`GET /api/cirra/status` 多一项 `pos`（`on`、`symbols`、`prefs`、`last`、`err`）；`POST /api/cirra/prefs { sl, ck }` 改开关（只收本机页面的 JSON）。
+- 测试：tests/poswatch.test.js 7 项（`parsePos`；`slCheck` / `slText` 的布防和句子；没开时不取数；止损止盈到价只说一次、话里没有金额、ATR 一小时内不重取；重启不重复、隔太久不补说、刚打开时重新建基准；新开的一笔说、已有的 / 开了很久的 / 别的品种的 / 没勾守则的不说；体检没开时也记下）；tests/cirra.test.js 加了 `/api/cirra/prefs` 的拒绝规则和存取。`npm test` 共 125 项。
+- 真机核对（2026-11-27）：用真的行情、日历、守则和持仓接口跑了三轮，只把“说给 Cirra”换成记下来，另造两笔持仓让它开口——止损那句用的是真实现价和 1 小时 ATR；用一组临时守则时体检那句也出来了；第三轮不重复；状态文件里没有金额。重启了本机代理，启动时打印“持仓看守：GOLD”；在页面上勾、取消“我的止损 / 止盈”，代理那边跟着变，页面的“不说两遍”判断也跟着变，最后恢复成都不说。
+- **没有验证的**：Cirra 真的开口（核对时她没开）；真实持仓走到止损附近的那一次；真实账户新开一笔。要用得先在预警页勾上。
+
 ### 3.4 预警接口
 
 ```js
@@ -518,7 +539,7 @@ web/
 
 - 各文件共享全局作用域（普通脚本，非 ES 模块）：只有 app.js 末尾的 `init()` 和少量常量初始化在加载时执行，其余都是函数，调用时才互相引用，所以除“config.js 在前、app.js 最后”外顺序不敏感。
 - 代理只托管 `web/` 下的 html/css/js（路径规范化后必须仍在 web/ 内），旧地址 `/market-analyzer.html` 302 跳到首页。
-- 测试：项目根目录 `npm test`（Node 自带 node:test）。`core/load.js` 在 vm 中按浏览器顺序加载 web/js/core/（`tests/load-core.js` 只是转一下）；`tests/summary.test.js` 验证 analyzeCandles 与 describeState；`tests/corepkg.test.js` 验证打出来的 marketlens-core 包与源码结果一致（见第 11 节）；`tests/golden.test.js` 对比 `tests/fixtures/golden-demo.json`（模拟数据，不含真实行情）；`tests/review.test.js` 验证复盘只用开仓前已收盘的K线并与 analyzeMTF 一致；`tests/store.test.js` 验证K线存储合并与读写；`tests/core.test.js` 为时间网格、已收盘判断、摆动点、前高前低、价位合并、情景触发（含收紧选项）、汇率取值与金额格式等单元测试；`tests/backtest.test.js` 验证回测不偷看未来、只限定入场区间、模拟成交规则、统计函数，并在随机游走数据上做空白对照；`tests/import-history.test.js` 验证历史导入的清洗、日期归一与周线/月线聚合；`tests/yahoo.test.js` 验证 Yahoo 数据的解析、清洗、日内对齐与聚合（不联网）；`tests/events.test.js` 验证经济日历与新闻（美东时间与夏令时换算、Forex Factory / BLS 日程 / RSS / Atom 解析、与官方日程核对合并、BLS 数值计算、缓存与失败回退、改期替换、公布后重查官方数据）；`tests/cirra.test.js` 验证桌宠 Cirra 播报（按她的协议发送、她没开时跳过、token 更换后重读、限速、状态，以及代理 `/api/cirra/notify` 的拒绝规则和按类型定表情）；`tests/aiscore.test.js` 验证 AI 分析留痕（记录读写、倾向解析、meta 清洗）与前瞻打分；`tests/aipack.test.js` 验证 AI 分析包（内容、范围、截短、未覆盖的写法、大小）；`tests/aiscore.test.js` 验证分析记录的打分；`tests/watch.test.js` 验证代理的常驻预警（首轮只建基准、到价说一次、重启不重复、间隔太久重新建基准）。`tests/context.test.js` 验证波动状态与交易时段，`tests/alertlog.test.js` 验证我画的线与预警记录（见 3.3.14）；`tests/study.test.js` 验证关键价位统计（不偷看未来、随机游走上的空白对照）与事件研究（见 3.3.16），命令行 `npm run study`（tools/study.js，结果写到 var/study/）。回测命令行 `npm run backtest`（tools/backtest.js，读本地K线存储或 `--data` 指定的导入历史，结果写到 var/backtest/）；`npm run import`（tools/import-history.js）从 Yahoo（黄金期货日线）、Binance（分页）或 CSV 导入长周期历史到 var/history/；`npm run bt:compare`（tools/bt-compare.js）按事先定好的几组情景规则并行回放、计入成本对比。核心算法有意改动时需重新生成标准答案。
+- 测试：项目根目录 `npm test`（Node 自带 node:test）。`core/load.js` 在 vm 中按浏览器顺序加载 web/js/core/（`tests/load-core.js` 只是转一下）；`tests/summary.test.js` 验证 analyzeCandles 与 describeState；`tests/corepkg.test.js` 验证打出来的 marketlens-core 包与源码结果一致（见第 11 节）；`tests/golden.test.js` 对比 `tests/fixtures/golden-demo.json`（模拟数据，不含真实行情）；`tests/review.test.js` 验证复盘只用开仓前已收盘的K线并与 analyzeMTF 一致；`tests/store.test.js` 验证K线存储合并与读写；`tests/core.test.js` 为时间网格、已收盘判断、摆动点、前高前低、价位合并、情景触发（含收紧选项）、汇率取值与金额格式等单元测试；`tests/backtest.test.js` 验证回测不偷看未来、只限定入场区间、模拟成交规则、统计函数，并在随机游走数据上做空白对照；`tests/import-history.test.js` 验证历史导入的清洗、日期归一与周线/月线聚合；`tests/yahoo.test.js` 验证 Yahoo 数据的解析、清洗、日内对齐与聚合（不联网）；`tests/events.test.js` 验证经济日历与新闻（美东时间与夏令时换算、Forex Factory / BLS 日程 / RSS / Atom 解析、与官方日程核对合并、BLS 数值计算、缓存与失败回退、改期替换、公布后重查官方数据）；`tests/cirra.test.js` 验证桌宠 Cirra 播报（按她的协议发送、她没开时跳过、token 更换后重读、限速、状态，以及代理 `/api/cirra/notify` 的拒绝规则和按类型定表情）；`tests/aiscore.test.js` 验证 AI 分析留痕（记录读写、倾向解析、meta 清洗）与前瞻打分；`tests/aipack.test.js` 验证 AI 分析包（内容、范围、截短、未覆盖的写法、大小）；`tests/aiscore.test.js` 验证分析记录的打分；`tests/watch.test.js` 验证代理的常驻预警（首轮只建基准、到价说一次、重启不重复、间隔太久重新建基准）；`tests/poswatch.test.js` 验证代理的持仓看守（见 3.3.17）。`tests/context.test.js` 验证波动状态与交易时段，`tests/alertlog.test.js` 验证我画的线与预警记录（见 3.3.14）；`tests/study.test.js` 验证关键价位统计（不偷看未来、随机游走上的空白对照）与事件研究（见 3.3.16），命令行 `npm run study`（tools/study.js，结果写到 var/study/）。回测命令行 `npm run backtest`（tools/backtest.js，读本地K线存储或 `--data` 指定的导入历史，结果写到 var/backtest/）；`npm run import`（tools/import-history.js）从 Yahoo（黄金期货日线）、Binance（分页）或 CSV 导入长周期历史到 var/history/；`npm run bt:compare`（tools/bt-compare.js）按事先定好的几组情景规则并行回放、计入成本对比。核心算法有意改动时需重新生成标准答案。
 - 格式化：`npm run format`（Prettier 3.3.3，配置见 `.prettierrc.json`）。
 
 ## 11. 核心库 marketlens-core（2026-11-26，路线图第 1 步）

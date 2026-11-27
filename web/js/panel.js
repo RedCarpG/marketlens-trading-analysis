@@ -425,6 +425,8 @@ function initPanel() {
       LS.set('cirra', CI);
       return;
     }
+    /* 持仓看守的两个开关：存在代理那边（cirra.js） */
+    if (c.dataset.cip) return ciPosSet(c.dataset.cip, c.checked);
     if (!c.dataset.al) return;
     AL[c.dataset.al] = c.checked ? 1 : 0;
     LS.set('alerts', AL);
