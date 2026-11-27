@@ -18,6 +18,14 @@ const esc = s =>
     /[&<>"']/g,
     c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
   );
+/* 取数失败的原因写成中文：代理和浏览器给的是英文的错误（fetch failed、HTTP 503……），常见的几种换个说法，认不出的照原样 */
+const evErr = e => {
+  const t = String(e || '');
+  if (/fetch failed|failed to fetch|ENOTFOUND|ECONN|EAI_AGAIN|network/i.test(t)) return '连不上';
+  if (/abort|timed? ?out|ETIMEDOUT/i.test(t)) return '超时了';
+  const h = t.match(/HTTP (\d{3})/i);
+  return h ? `对方返回 ${h[1]}` : t;
+};
 const ccyOf = () => cur.ccy || ['USD'];
 const nwTopic = () => (EVO.nw == 'macro' ? 'macro' : cur.news || 'macro');
 const TOPN = { gold: '黄金', btc: '比特币', macro: '宏观' },
@@ -286,7 +294,7 @@ function evRisk() {
   if (!LOCAL) return '<div class="evw off" data-go="ev">经济日历：未覆盖（需本地代理）</div>';
   if (!EV) return '';
   if (!EV.events)
-    return `<div class="evw off" data-go="ev">经济日历：未获取到${EV.err ? '（' + esc(EV.err) + '）' : ''}</div>`;
+    return `<div class="evw off" data-go="ev">经济日历：未获取到${EV.err ? '（' + esc(evErr(EV.err)) + '）' : ''}</div>`;
   const now = Date.now(),
     es = EV.events.filter(e => evHot(e) && e.ts > now - 36e5 && e.ts < now + 24 * 36e5);
   if (!es.length) return '';
@@ -314,7 +322,7 @@ function evPanel() {
       .join(''),
     calOk = (EV.sources || []).slice(0, 2).some(s => s.ok),
     warn = EV.err
-      ? `<div class="evoff"><b>${evs.length ? '刷新失败，显示的是上次的数据' : '经济日历：未获取到'}</b><div class="mu sm">${esc(EV.err)}。不代表近期没有重要事件。</div></div>`
+      ? `<div class="evoff"><b>${evs.length ? '刷新失败，显示的是上次的数据' : '经济日历：未获取到'}</b><div class="mu sm">${esc(evErr(EV.err))}。不代表近期没有重要事件。</div></div>`
       : !calOk
         ? '<div class="evoff"><b>日历来源暂时都不可用</b><div class="mu sm">下面只有本地已存的事件和内置的 FOMC 日程，可能不完整。</div></div>'
         : '';
@@ -343,10 +351,10 @@ ${ng
           x =>
             `<div class="evd"><span>${esc(x.name)}<small>${+String(x.ref).slice(5)}月${x.prelim ? ' · 初值' : ''}</small></span><b>${dv(x)}</b><span class="dp">前值 ${dv(x, 1)}</span></div>`
         )
-        .join('') || `<div class="empty">${D.err ? esc(D.err) : '暂无'}</div>`,
+        .join('') || `<div class="empty">${D.err ? '没取到：' + esc(evErr(D.err)) : '暂无'}</div>`,
     datNote =
       D.err && D.items && D.items.length
-        ? `<div class="note2">最近一次更新失败：${esc(D.err)}，显示的是上次的数据</div>`
+        ? `<div class="note2">最近一次更新失败：${esc(evErr(D.err))}，显示的是上次的数据</div>`
         : '';
   /* 经济日历：昨天起 3 周，按本机日期分组 */
   const opt = (k, v, n, t) =>
@@ -382,9 +390,9 @@ ${ng
     nbad = N && N.sources ? N.sources.filter(s => !s.ok) : [],
     nws = !N
       ? '<div class="empty"><i class="spin"></i>加载中…</div>'
-      : (N.err ? `<div class="note2">刷新失败：${esc(N.err)}</div>` : '') +
+      : (N.err ? `<div class="note2">刷新失败：${esc(evErr(N.err))}</div>` : '') +
         (nbad.length
-          ? `<div class="note2">暂不可用：${nbad.map(s => `${esc(s.name)}（${esc(s.err)}）`).join('、')}</div>`
+          ? `<div class="note2">暂不可用：${nbad.map(s => `${esc(s.name)}（${esc(evErr(s.err))}）`).join('、')}</div>`
           : '') +
         (N.items
           .slice(0, 30)
@@ -397,7 +405,8 @@ ${ng
 ${blk('evd', `官方数据 <span class="mu">BLS${D.at ? ' · ' + fmt('1h', D.at) : ''}</span>`, dat + datNote)}
 ${blk('evc', `经济日历 <span class="n">${list.length}</span>`, cal)}
 ${blk('nws', `新闻 <span class="mu">${TOPN[nwTopic()]} · ${EVO.lang == 'zh' ? '中文' : 'English'}</span>`, nt + nws)}
-<p class="disc">日历来自 Forex Factory（第三方整理，预期值为该站汇总，只覆盖本周），并与 BLS、美联储的官方日程核对；BLS / FOMC 日程覆盖之后几个月。官方数据来自 BLS 公共 API。新闻为第三方 RSS 标题，未经核实。事件不参与评分和情景；公布前后波动可能放大，不能据此判断涨跌方向。时间为本机时区。</p>`;
+<p class="disc">新闻是第三方 RSS 标题，未经核实。事件不参与评分和情景；公布前后波动可能放大，不能据此判断涨跌方向。时间为本机时区。</p>
+${more('数据从哪来', '日历来自 Forex Factory（第三方整理，预期值为该站汇总，只覆盖本周），并与 BLS、美联储的官方日程核对；BLS / FOMC 日程覆盖之后几个月。官方数据来自 BLS 公共 API。')}`;
 }
 /* 日历的一行：时间、货币、影响等级（三格）、名称（✓ 已与官方日程核对）、公布/预期/前值；已过去且在已加载K线范围内的可点击定位 */
 function evRow(e, now) {

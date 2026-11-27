@@ -175,6 +175,6 @@ function aiBlock() {
     'ai',
     `AI 分析 <span class="mu">${on ? '交给 Cirra 或复制给 AI' : '复制给 AI'}</span>`,
     `<div class="tbar">${ask}<button class="chip" id="aic" title="把当前的多周期状态、价位、情景、K线、事件、新闻、我的持仓整理成分析包，连同提问一起复制">复制分析包</button><button class="chip" id="aiv" title="在新标签页里看要复制的全文">查看</button></div>
-${res}${st}${aiScoreHtml()}<div class="note2">${on ? '“让 Cirra 分析”用她聊天的那个模型（你的登录），需要带 /ask 接口的 Cirra、并在她的设置里打开「MarketLens 行情」；结论她念出来，全文在这里。也可以复制' : '复制'}后粘贴到 claude.ai 等 AI 里。AI 只作分析助手：这些规则本身没有回测优势，AI 的判断也无法用历史回测检验。</div>`
+${res}${st}${aiScoreHtml()}${more('怎么用、要注意什么', `${on ? '“让 Cirra 分析”用她聊天的那个模型（你的登录），需要带 /ask 接口的 Cirra、并在她的设置里打开「MarketLens 行情」；结论她念出来，全文在这里。也可以复制' : '复制'}后粘贴到 claude.ai 等 AI 里。AI 只作分析助手：这些规则本身没有回测优势，AI 的判断也无法用历史回测检验。`)}`
   );
 }

@@ -15,7 +15,8 @@ let chart,
   MK = { hl: 1, sr: 1, ar: 1, pl: 0, tr: 1, ev: 1, ...LS.get('marks', {}) },
   /* PCOL：右侧面板收起成图标条；WCOL：左侧自选收起成竖窄条（都记在本地）；FOCUS：专注模式（只看K线，不记） */
   PCOL = LS.get('pnCol', 0),
-  WCOL = LS.get('wlCol', 0),
+  /* 窄屏（上下排列）第一次打开时自选先收着，K线在第一屏；点顶栏的品种名展开 */
+  WCOL = LS.get('wlCol', matchMedia('(max-width:900px)').matches ? 1 : 0),
   FOCUS = 0,
   /* 各数据服务是否可用（本地代理 /api/sources），设置里的数据源按钮据此置灰 */
   SRCOK = null,
@@ -373,8 +374,9 @@ function axisCls() {
 /* 价格轴左移的同时（CSS 过渡 0.34 秒），右侧价位标签层按 RIN 让到价格轴左边：
    正停在最新K线处时逐帧调整图表库的右侧留白，最新K线跟着价格轴移动；在看历史行情时不挪画面，面板下面的K线透过半透明底仍看得到，
    只逐帧重绘让标签跟上（右侧留白在下次换数据时按当前宽度设好，见 show） */
-/* RGAP：最新K线右边留出的空白（像素），这块“还没走出来”的区域另铺底色，见 nowMark */
-const RGAP = 80;
+/* RGAP：最新K线右边留出的空白（像素），这块“还没走出来”的区域另铺底色，见 nowMark。
+   右侧的价位标签（marks.js 的 fbLabels）就放在这块空白里，不盖住最新的K线，所以留得比较宽；窄屏放不下那么多，留窄一些（标签的字也小一号） */
+const RGAP = matchMedia('(min-width:901px)').matches ? 164 : 110;
 let RIN = 0,
   rinAnim = 0;
 function setRin(to) {
@@ -430,6 +432,7 @@ function init() {
     pl: '情景的入场 / 止损 / 目标',
     tr: '我的开平仓、持仓与止损止盈',
     ev: '非农、CPI、FOMC 等高影响事件的公布时间',
+    ss: '亚洲、欧洲、美国时段的底色（15m、1h）',
   };
   $('#mks').innerHTML =
     '<div class="mh">图上标注</div>' +
@@ -484,6 +487,8 @@ function init() {
     if (cur.src != 'csv') LS.set('sym', cur.sym);
     wl();
     load();
+    /* 窄屏：选完品种把自选收起来，直接看到K线 */
+    if (!WIDE()) setWcol(1);
   };
   /* 面板收起 / 展开、专注模式；图标条上点某一页的图标直接展开到那一页。打开页面时直接是上次的状态，不播放收起动画 */
   document.body.classList.add('boot');

@@ -15,7 +15,17 @@ const SHORT = {
   收盘跌破布林下轨: '破下轨',
 };
 const KEYSIG = new Set(['金叉', '死叉', '破上轨', '破下轨']); // 这几类总是标出；其余信号只在靠近关键价位时标出
-const MKN = { hl: '前高前低', sr: '支撑阻力', ar: '信号箭头', pl: '情景', tr: '我的交易', ev: '经济事件' };
+const MKN = {
+  hl: '前高前低',
+  sr: '支撑阻力',
+  ar: '信号箭头',
+  pl: '情景',
+  tr: '我的交易',
+  ev: '经济事件',
+  ss: '交易时段',
+};
+/* 交易时段底色的三种颜色（亚洲 / 欧洲 / 美国），面板里“交易时段”块的圆点也用；和涨跌色、交易的蓝橙都错开 */
+const SESSC = { asia: '#6f7ce8', eu: '#2fa8c2', us: '#d49a3a' };
 /* “标注”菜单里每个开关前的小图例，与图上画法一致 */
 const SW = {
   hl: '<path d="M5 5h17" style="stroke:var(--dn);stroke-dasharray:1.5 3;stroke-width:1.5"/><path d="M5 1l3 4-3 4-3-4z" style="fill:var(--dn)"/>',
@@ -24,6 +34,7 @@ const SW = {
   pl: '<rect x="1" width="21" height="5" style="fill:var(--up);opacity:.5"/><rect x="1" y="5" width="21" height="5" style="fill:var(--dn);opacity:.5"/><path d="M1 5h21" style="stroke:var(--ac);stroke-width:1.5"/>',
   tr: '<path d="M5 2l4 7H1z" style="fill:var(--tb)"/><path d="M8 6l9-3" style="stroke:var(--up);stroke-width:1.5"/><circle cx="18.5" cy="3" r="2.2" style="fill:none;stroke:var(--up);stroke-width:1.5"/>',
   ev: '<path d="M8 0v10" style="stroke:var(--mu);stroke-dasharray:1.5 2;stroke-width:1.2"/><rect x="2" y="5.5" width="12" height="4.5" rx="1.5" style="fill:none;stroke:var(--mu);stroke-width:1.1"/>',
+  ss: `<rect width="7" height="10" style="fill:${SESSC.asia};opacity:.45"/><rect x="7.5" width="6" height="10" style="fill:${SESSC.eu};opacity:.45"/><rect x="14" width="8" height="10" style="fill:${SESSC.us};opacity:.45"/>`,
 };
 /* 点击“近期信号”时自动打开的相关指标 */
 const SIGIND = {
@@ -54,6 +65,8 @@ const TXT = {
    我的交易  买=蓝色▲、卖=橙色▼（与涨跌色区分），开平仓之间按盈亏着色的实线，平仓空心圆 + 实心盈亏标签
    我的持仓  粗实线 + 实心标签；我的止损/止盈为虚线 + 空心标签
    经济事件  公布时间所在K线上的竖点线（弱化色）+ 底部空心小标签（非农、CPI、FOMC…）
+   我画的线  贯穿的强调色细实线 + 实心强调色标签“我的线”（别的实心标签都是涨跌色或交易的蓝橙）
+   交易时段  很淡的整列底色（亚洲 / 欧洲 / 美国各一种颜色），每段左上角一个小字；只在 15 分钟、1 小时周期画，默认关
    右侧所有价位标签统一由标签层绘制，自动上下错开，不再互相压住 */
 const TRC = [
     ['#2f6fd6', '#d9822b'],
@@ -145,13 +158,22 @@ function regOverlays() {
     },
   ]);
   /* 箭头：看多在最低价下方向上，看空在最高价上方向下 */
-  ov('fbArrow', 2, ({ overlay, coordinates }) => {
+  /* 字：箭头挨得太近时字会叠在一起读不出来，所以从最新的往回排，和已经留下字的箭头压到一起的就只画三角、不写字
+     （row 是不比它旧的箭头，新的在前，最后一个是它自己；按字的实际位置算：多头的字在最低价下面，空头的在最高价上面）。
+     放大以后隔得开了字会回来；写了什么在“近期信号”列表和悬停卡里都有 */
+  ov('fbArrow', 2, ({ overlay, coordinates, xAxis, yAxis }) => {
     const e = overlay.extendData,
       { x, y } = coordinates[0],
       s = e.dir > 0 ? 1 : -1,
       t = y + 5 * s,
-      b = y + 13 * s;
-    return [
+      b = y + 13 * s,
+      kept = [];
+    for (const q of e.row || []) {
+      const qy = yAxis.convertToPixel(q.px) + (q.dir > 0 ? 22 : -22),
+        r = { q, x: xAxis.convertToPixel(q.i), y: qy, w: q.tw };
+      if (kept.every(k => Math.abs(k.x - r.x) >= (k.w + r.w) / 2 + 6 || Math.abs(k.y - r.y) >= 18)) kept.push(r);
+    }
+    const fg = [
       {
         type: 'polygon',
         attrs: {
@@ -163,13 +185,15 @@ function regOverlays() {
         },
         styles: { style: 'fill', color: e.color },
       },
-      {
+    ];
+    if (!e.row || kept.some(k => k.q === e.row[e.row.length - 1]))
+      fg.push({
         type: 'text',
         attrs: { x, y: b + 2 * s, text: e.text, align: 'center', baseline: s > 0 ? 'top' : 'bottom' },
         styles: { ...TXT, size: 12, color: e.tc || e.color },
         ignoreEvent: true,
-      },
-    ];
+      });
+    return fg;
   });
   /* 区间：两个价格之间的半透明带 */
   ov('fbZone', 3, ({ overlay, coordinates, bounding }) => {
@@ -291,6 +315,36 @@ function regOverlays() {
     if (!barSpace || barSpace.gapBar >= (e.top ? 1 : 3)) label(x, 'center', e.text);
     return fg;
   });
+  /* 交易时段底色：整个图只有这一个图形，extendData.segs 是按“同一天同一时段”分好的K线下标范围（core/context.js 的 sessBands），
+     每次重画只算画面里看得到的那几段。每段从第一根的左边缘铺到最后一根的右边缘；够宽（≥30px）时在左上角写“亚洲 / 欧洲 / 美国”，
+     位置让开顶栏和主图图例（每开一个主图指标图例多一行） */
+  ov('fbSess', 2, ({ overlay, bounding, barSpace, xAxis }) => {
+    const e = overlay.extendData,
+      vr = chart.getVisibleRange(),
+      hb = barSpace.halfBar,
+      top = safeT() + 8 + 20 * MAIN.filter(n => on[n]).length,
+      fg = [];
+    for (const g of e.segs) {
+      if (g.b < vr.from - 1 || g.a > vr.to) continue;
+      const x1 = xAxis.convertToPixel(g.a) - hb,
+        x2 = xAxis.convertToPixel(g.b) + hb,
+        c = SESSC[g.k];
+      fg.push({
+        type: 'rect',
+        attrs: { x: x1, y: 0, width: x2 - x1, height: bounding.height },
+        styles: { style: 'fill', color: c + e.a },
+        ignoreEvent: true,
+      });
+      if (x2 - x1 >= 30)
+        fg.push({
+          type: 'text',
+          attrs: { x: x1 + 4, y: top, text: g.n, align: 'left', baseline: 'top' },
+          styles: { ...TXT, size: 11, color: c + 'dd' },
+          ignoreEvent: true,
+        });
+    }
+    return fg;
+  });
   /* 最新K线分界：最新一根K线右边缘画一条竖虚线，右侧（还没走出来的区域）铺一层淡淡的强调色，主图和各副图都画 */
   ov('fbNow', 2, ({ overlay, coordinates, bounding, barSpace }) => {
     const e = overlay.extendData,
@@ -394,11 +448,61 @@ function regOverlays() {
           { x: x - 6, y: y - 12 },
           { x: x + 6, y: y - 12 },
         ];
-  ov('fbTrade', 3, ({ overlay, coordinates, barSpace }) => {
+  /* 盈亏标签：日线这类大周期上，几笔交易挤在相邻的几根K线里，标签会叠成一团。和箭头的字一样从最新的一笔往回排，
+     标签和已经留下的压到一起的就不写（连线、三角、圆照画）。all 是这一批交易的平仓位置和标签宽度（新的在前），
+     同一帧里各笔交易算出来的结果一样，所以按画面位置记一次（trKeep） */
+  ov('fbTrade', 3, ({ overlay, coordinates, barSpace, xAxis, yAxis }) => {
     const e = overlay.extendData,
       [a, b] = coordinates,
       hb = ((barSpace && barSpace.bar) || 6) / 2;
-    return [
+    let show = true;
+    if (e.all) {
+      const key = [
+        e.all.length,
+        e.all[0].id,
+        xAxis.convertToPixel(0),
+        barSpace.bar,
+        yAxis.convertToPixel(e.all[0].v),
+      ].join('|');
+      if (trKeep.key !== key) {
+        const kept = [];
+        for (const q of e.all) {
+          const r = { id: q.id, x: xAxis.convertToPixel(q.i) + 8, y: yAxis.convertToPixel(q.v), w: q.tw };
+          if (kept.every(k => r.x + r.w < k.x || k.x + k.w < r.x || Math.abs(k.y - r.y) >= 17)) kept.push(r);
+        }
+        trKeep = { key, ids: new Set(kept.map(k => k.id)) };
+      }
+      show = trKeep.ids.has(e.id);
+    }
+    /* 开仓和平仓落在同一根或紧挨着的K线上（大周期上看日内的交易）：画不出连线，三角和圆还会叠在一起，
+       只画一个按盈亏着色的实心圆点；放大到两头分得开了再画完整的 */
+    if (Math.abs(b.x - a.x) < 12) {
+      const dot = [
+        {
+          type: 'circle',
+          attrs: { x: b.x, y: b.y, r: 4 },
+          styles: { style: 'stroke_fill', color: e.pl, borderColor: e.bg || e.pl, borderSize: 1 },
+        },
+      ];
+      if (show)
+        dot.push({
+          type: 'text',
+          attrs: { x: b.x + 8, y: b.y, text: e.text, align: 'left', baseline: 'middle' },
+          styles: {
+            ...TXT,
+            size: 11,
+            color: '#fff',
+            backgroundColor: e.pl,
+            borderRadius: 3,
+            paddingLeft: 3,
+            paddingRight: 3,
+            paddingTop: 1,
+            paddingBottom: 1,
+          },
+        });
+      return dot;
+    }
+    const fg = [
       /* 开平仓之间的时间 × 价格范围铺一层很淡的盈亏色 */
       {
         type: 'rect',
@@ -419,7 +523,9 @@ function regOverlays() {
         attrs: { x: b.x, y: b.y, r: 4 },
         styles: { style: 'stroke', color: e.pl, borderColor: e.pl, borderSize: 2 },
       },
-      {
+    ];
+    if (show)
+      fg.push({
         type: 'text',
         attrs: { x: b.x + 8, y: b.y, text: e.text, align: 'left', baseline: 'middle' },
         styles: {
@@ -433,8 +539,8 @@ function regOverlays() {
           paddingTop: 1,
           paddingBottom: 1,
         },
-      },
-    ];
+      });
+    return fg;
   });
   /* 我的持仓：点依次为 开仓 / 当前价；开仓价到当前价之间从开仓K线起铺一层盈亏色（浮盈涨色、浮亏跌色），开仓三角 + 粗实线延伸到右边缘（标签在标签层） */
   ov('fbPos', 3, ({ overlay, coordinates, bounding }) => {
@@ -461,7 +567,7 @@ function regOverlays() {
       { type: 'polygon', attrs: { coordinates: tri(x, y, e.buy) }, styles: { style: 'fill', color: e.color } },
     ];
   });
-  /* 右侧标签层：所有价位标签在此统一绘制。按 y 排序后上下推开至少 18px（先向下推、超出底部再向上收），被推开的用细线连回原价位。
+  /* 右侧标签层：所有价位标签在此统一绘制。按 y 排序后上下推开至少 18px（先向下推、超出底部再向上收；最下面 30px 留给经济事件的标签），被推开的用细线连回原价位。
    右侧面板展开时价格轴左移 RIN，标签跟着贴在价格轴左边（线条仍延伸到面板下面）。
    样式：plain=纯文字（半透明底），outline=空心框，fill=实心框 */
   ov('fbLabels', 2, ({ overlay, coordinates, bounding }) => {
@@ -477,7 +583,7 @@ function regOverlays() {
       l.ay = Math.max(l.y, i ? L[i - 1].ay + G : 8);
     });
     for (let i = L.length - 1; i >= 0; i--) {
-      const lim = i == L.length - 1 ? h - 8 : L[i + 1].ay - G;
+      const lim = i == L.length - 1 ? h - 30 : L[i + 1].ay - G;
       if (L[i].ay > lim) L[i].ay = lim;
     }
     const pad = { paddingLeft: 4, paddingRight: 4, paddingTop: 1, paddingBottom: 1, borderRadius: 3 };
@@ -504,14 +610,21 @@ function regOverlays() {
       fg.push({
         type: 'text',
         attrs: { x: w - 8, y: l.ay, text: l.text, align: 'right', baseline: 'middle' },
-        styles: { ...TXT, ...st },
+        styles: { ...TXT, size: e.small ? 11 : 13, ...st },
         ignoreEvent: true,
       });
       return fg;
     });
   });
 }
-const cssv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+/* 取主题颜色。三位写法的十六进制（浅色主题的 #fff）补成六位：很多地方在颜色后面直接拼两位透明度（如 bg + 'cc'），
+   三位的拼出来不是有效颜色，画布会沿用上一次的填充色，标签就成了一块实心色块 */
+const cssv = n => {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  return /^#[0-9a-f]{3}$/i.test(v) ? '#' + [...v.slice(1)].map(c => c + c).join('') : v;
+};
+/* 画布上一段文字大约多宽（像素）：汉字按字号算，字母数字按 0.58 个字号。只用来判断箭头的字会不会互相压住 */
+const txtW = (t, size) => [...t].reduce((w, c) => w + (c.charCodeAt(0) > 255 ? size : size * 0.58), 0);
 /* 图上点击：交易/持仓/信号箭头可点击高亮；点在图上空白处取消高亮（拖动图表不算点击）。
    ovHit 记录刚点中图形的时间，让随后冒泡上来的 DOM click 不再当作“点空白” */
 let ovHit = 0,
@@ -568,12 +681,12 @@ function trMarks(t, open) {
   });
   lab(
     t.openRate,
-    `持仓 ${t.isBuy ? '多' : '空'} ${+t.units.toFixed(2)} @${f(t.openRate)}${t.pnl != null ? ' ' + money(t.pnl) : ''}`,
+    `${t.isBuy ? '多' : '空'} @${f(t.openRate)}${t.pnl != null ? ' ' + money(t.pnl) : ''}`,
     t.pnl == null ? (t.isBuy ? TB : TS) : t.pnl >= 0 ? U : D
   );
   [
-    [t.sl, '我的止损', 'SL', D],
-    [t.tp, '我的止盈', 'TP', U],
+    [t.sl, '止损', 'SL', D],
+    [t.tp, '止盈', 'TP', U],
   ].forEach(([v, n, tag, c]) => {
     if (v > 0 && Math.abs(v - now) / now < 0.3) {
       items.push({
@@ -589,15 +702,28 @@ function trMarks(t, open) {
         points: [{ timestamp: a, value: v }],
         extendData: { color: c, size: 1.5, dash: 'dashdot', ray: 1, tag },
       });
-      lab(v, `${n} ${f(v)} · ≈${money(pAt(v))}`, c);
+      lab(v, `${n} ${f(v)} ≈${money(pAt(v))}`, c);
     }
   });
   return { items, labs };
 }
 let ovSig = '',
-  lastM = null;
+  lastM = null,
+  trKeep = { key: '', ids: new Set() };
+/* 时间落在第几根K线上（没有正好对上的取它前面那根） */
+function barIdx(ts) {
+  let lo = 0,
+    hi = bars.length - 1;
+  while (lo < hi) {
+    const m = (lo + hi + 1) >> 1;
+    if (bars[m].timestamp <= ts) lo = m;
+    else hi = m - 1;
+  }
+  return lo;
+}
 function drawMarks(m) {
   lastM = m;
+  sessMark();
   const f = v => v.toFixed(cur.p),
     items = [],
     labs = [],
@@ -614,7 +740,9 @@ function drawMarks(m) {
       x = m.t.a.a,
       M = mainLv(m.L, now, x, tf),
       pm = [];
-    /* 价位标注：支撑阻力（挡回≥3次的画成区间）+ 当前及更大周期的前高/前低；同侧相距 0.3 ATR 内的合并成一条，标签拼在一起 */
+    /* 价位标注：支撑阻力（挡回≥3次的画成区间）+ 当前及更大周期的前高/前低；同侧相距 0.3 ATR 内的合并成一条。
+       标签写短（2026-11-27）：只写最大的那个周期，挡回次数写成“×N”，放得进最新K线右边的空白里、不盖住最新的K线；
+       参与的全部周期在面板的“关键价位”里 */
     if (MK.sr)
       M.sup.concat(M.res).forEach(l =>
         pm.push({
@@ -623,7 +751,8 @@ function drawMarks(m) {
           big: TFW[l.top] >= 5,
           low: TFW[l.top] < TFW[tf],
           zone: l.touch >= 3 ? [Math.min(l.zlo, l.p - x * 0.15), Math.max(l.zhi, l.p + x * 0.15)] : null,
-          t: `${l.tfs.join('·')} ${l.side > 0 ? '支撑' : '阻力'}${l.touch >= 3 ? ` 挡回${l.touch}次` : ''}`,
+          tf: l.top,
+          t: `${l.top} ${l.side > 0 ? '支撑' : '阻力'}${l.touch >= 3 ? '×' + l.touch : ''}`,
         })
       );
     if (MK.hl)
@@ -642,29 +771,14 @@ function drawMarks(m) {
         g.zone = g.zone || q.zone;
       } else mg.push({ ...q, m: [q] });
     }
-    /* 合并后各部分价格相同时只写一次价格，不同时各写各的（前高/前低是精确的K线高低点，支撑阻力是合并后的代表价） */
+    /* 合并后的标签只写一条：有支撑阻力时写其中周期最大的那条（同一处还有前高/前低就加 ◆ 前缀），只有前高/前低时写周期最大的那个 */
     mg.forEach(g => {
       const hl = g.m.filter(q => q.hl),
         sr = g.m.filter(q => !q.hl),
         col = g.side > 0 ? U : D,
-        parts = [
-          ...(hl.length
-            ? [
-                {
-                  t: `◆${hl
-                    .map(q => q.hl)
-                    .sort((a, b) => TFW[b] - TFW[a])
-                    .join('·')}${hl[0].t}`,
-                  p: hl[0].p,
-                },
-              ]
-            : []),
-          ...sr.map(q => ({ t: q.t, p: q.p })),
-        ],
-        same = parts.every(q => f(q.p) == f(parts[0].p)),
-        text = same
-          ? parts.map(q => q.t).join(' · ') + ' ' + f(parts[0].p)
-          : parts.map(q => `${q.t} ${f(q.p)}`).join(' · '),
+        best = sr.length ? sr.reduce((a, q) => (TFW[q.tf] > TFW[a.tf] ? q : a)) : null,
+        top = hl.length ? hl.reduce((a, q) => (TFW[q.hl] > TFW[a.hl] ? q : a)) : null,
+        text = best ? `${top ? '◆' : ''}${best.t} ${f(best.p)}` : `◆${top.hl}${top.t} ${f(top.p)}`,
         o = hl.length ? hl.reduce((a, q) => (q.ts < a.ts ? q : a)) : null,
         ot = o && (snapTs(o.ts) || bars[0].timestamp);
       if (g.zone)
@@ -708,7 +822,12 @@ function drawMarks(m) {
         o.near = o.near || near;
         grp.set(k, o);
       }
-      [...grp.values()].slice(-8).forEach(({ g, b, px, near, ns }) =>
+      const arr = [...grp.values()].slice(-8);
+      arr.forEach(o => {
+        o.text = o.ns.join('+') + (o.near ? `·${o.g.dir > 0 ? '支撑' : '阻力'}` : '');
+        o.tw = txtW(o.text, 12);
+      });
+      arr.forEach(({ g, b, px, text }) =>
         items.push({
           name: 'fbArrow',
           points: [{ timestamp: b.timestamp, value: px }],
@@ -717,7 +836,11 @@ function drawMarks(m) {
             dir: g.dir,
             color: g.dir > 0 ? U : D,
             tc: MU,
-            text: ns.join('+') + (near ? `·${g.dir > 0 ? '支撑' : '阻力'}` : ''),
+            text,
+            row: arr
+              .filter(q => q.g.i > g.i || q.g === g)
+              .sort((u, v) => v.g.i - u.g.i || (v.g === g ? -1 : 1))
+              .map(q => ({ i: q.g.i, px: q.px, dir: q.g.dir, tw: q.tw })),
           },
         })
       );
@@ -749,7 +872,20 @@ function drawMarks(m) {
         });
     /* 我的交易：最近 60 笔已平仓（开平仓都在已加载数据范围内的），以及当前持仓和它们的止损/止盈 */
     if (MK.tr && TR && TR.sym === cur.sym) {
-      TR.closed.slice(-60).forEach(t => items.push(...trMarks(t).items));
+      const cl = TR.closed
+          .slice(-60)
+          .map(t => trMarks(t).items[0])
+          .filter(Boolean),
+        all = cl
+          .map((it, k) => ({
+            id: k,
+            i: barIdx(it.points[1].timestamp),
+            v: it.points[1].value,
+            tw: txtW(it.extendData.text, 11) + 8,
+          }))
+          .reverse();
+      cl.forEach((it, k) => Object.assign(it.extendData, { id: k, all }));
+      items.push(...cl);
       TR.open.forEach(p => {
         const r = trMarks(p, 1);
         items.push(...r.items);
@@ -757,18 +893,25 @@ function drawMarks(m) {
       });
     }
   }
+  /* 我画的线（alerts.js）：贯穿的强调色细实线 + 右侧实心标签。预警关着也画，线是按品种存的，换周期也在 */
+  if (bars.length && cur.src != 'csv')
+    myLines().forEach(l => {
+      items.push({ name: 'fbLine', points: [{ timestamp: ts, value: l.p }], extendData: { color: A, size: 1 } });
+      lab(l.p, `我的线 ${f(l.p)}`, A, 'fill');
+    });
   items.push(...evMarks());
   if (labs.length)
     items.push({
       name: 'fbLabels',
       points: labs.map(l => ({ timestamp: ts, value: l.v })),
-      extendData: { labs, bg: BG },
+      extendData: { labs, bg: BG, small: !WIDE() },
     });
   const sig = JSON.stringify([
     cur.sym,
     tf,
     theme,
     scheme,
+    WIDE(),
     items.map(i => [i.name, i.points, i.extendData.text, i.extendData.labs && i.extendData.labs.map(l => l.text)]),
   ]);
   if (sig === ovSig) return;
@@ -800,4 +943,27 @@ function nowMark() {
       pid
     )
   );
+}
+/* 交易时段底色（“标注”菜单的“交易时段”，默认关）：只在 15 分钟、1 小时周期画（见 core/context.js 的 SESS_TFS）。
+   单独一组图形，放在最底层；K线多了一根、换了品种周期或主题才重建，平移缩放时由 fbSess 自己按画面重算 */
+let ssSig = '';
+function sessMark() {
+  const show = MK.ss && bars.length && cur.src != 'csv' && SESS_TFS.includes(tf),
+    last = bars[bars.length - 1],
+    sig = show ? [cur.sym, cur.src, tf, bars.length, bars[0].timestamp, last.timestamp, theme].join('|') : '';
+  if (sig === ssSig) return;
+  ssSig = sig;
+  chart.removeOverlay({ groupId: 'ss' });
+  if (!show) return;
+  chart.createOverlay({
+    name: 'fbSess',
+    groupId: 'ss',
+    lock: true,
+    zLevel: -2,
+    points: [{ timestamp: last.timestamp, value: last.close }],
+    extendData: {
+      a: DARK[theme] ? '18' : '16',
+      segs: sessBands(bars).map(g => ({ ...g, n: SESS.find(s => s.k == g.k).s })),
+    },
+  });
 }

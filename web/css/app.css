@@ -2073,16 +2073,17 @@ a.nwi[href]:hover .nt {
   vertical-align: 0;
 }
 
-/* ===== 预警弹出提示：右下角堆叠，从右侧滑入，底部细线倒计时 10 秒，点击关闭 ===== */
+/* ===== 预警弹出提示：堆在K线区域的左下角（自选右边），从下面浮上来，底部细线倒计时 10 秒，点击关闭。
+   原来在窗口右下角，正好盖住右侧面板最下面的内容（2026-11-27 挪开）；窄屏时横在最下面 ===== */
 #toasts {
   position: fixed;
-  right: 16px;
+  left: calc(var(--L, 0px) + 16px);
   bottom: 16px;
   z-index: 50;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-width: 360px;
+  width: min(360px, calc(100vw - 24px));
 }
 .toast {
   position: relative;
@@ -2123,12 +2124,12 @@ a.nwi[href]:hover .nt {
 }
 .toast.out {
   opacity: 0;
-  transform: translateX(24px);
+  transform: translateY(10px);
 }
 @keyframes toastIn {
   from {
     opacity: 0;
-    transform: translateX(28px) scale(0.98);
+    transform: translateY(14px) scale(0.98);
   }
 }
 @keyframes toastT {
@@ -2840,4 +2841,262 @@ button.jtag.on {
 }
 .rvr td:last-child {
   white-space: normal;
+}
+
+/* ===== 路线图第 5 步第一批：波动状态、交易时段、我画的线、预警记录（SPEC 3.3.14） ===== */
+/* 波动状态（分析页“关键数值”里）：一句事实 + 一条刻度（左边最小、右边最大）+ 怎么比的 */
+.volst {
+  margin: 6px 0 4px;
+  padding: 8px 10px;
+  border-radius: var(--rs);
+  background: var(--bg);
+}
+.volst .vt {
+  font-weight: 600;
+}
+.vbar {
+  position: relative;
+  height: 4px;
+  margin: 9px 5px 8px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--mu) 30%, transparent);
+}
+.vbar i {
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--tx);
+  border-radius: 50%;
+  background: var(--pn);
+  transform: translate(-50%, -50%);
+  transition: left 0.6s var(--ease);
+}
+/* 交易时段：一个时段一行——圆点（和图上底色同色）、名字和钟点、平均波幅；现在所在的时段垫淡底 */
+.ssn {
+  margin-bottom: 4px;
+}
+.ssr {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  margin: 0 -6px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.ssr.now {
+  background: var(--acs);
+}
+.ssr .d {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+.ssr small {
+  display: block;
+  color: var(--mu);
+  font-size: 11px;
+  font-weight: 400;
+}
+.ssr .sv {
+  text-align: right;
+}
+/* 我画的线（预警页）：输入价格 / 在图上点；每条线一行，✕ 删掉 */
+.mla {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.mla input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--bd);
+  border-radius: var(--rs);
+  background: var(--bg);
+  color: var(--tx);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+.mla input:focus {
+  outline: none;
+  border-color: var(--ac);
+}
+.mla .chip {
+  flex: none;
+  padding: 3px 10px;
+}
+.mlr {
+  display: grid;
+  grid-template-columns: 6px auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  font-variant-numeric: tabular-nums;
+}
+.mlr .d {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ac);
+}
+.mlx {
+  padding: 0 7px;
+  border-color: transparent;
+  color: var(--mu);
+  font-size: 11px;
+  line-height: 20px;
+}
+.mlx:hover {
+  border-color: var(--bd);
+  color: var(--dn);
+}
+/* “在图上点一下”：鼠标变十字；顶栏下面一条提示 */
+body.mlpick #chart,
+body.mlpick #chart * {
+  cursor: crosshair !important;
+}
+#mlh {
+  position: fixed;
+  z-index: 30;
+  top: calc(var(--tbh, 0px) + 18px);
+  left: calc(var(--L, 0px) + (100vw - var(--L, 0px) - var(--R, 0px)) / 2);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100vw - 24px);
+  padding: 7px 8px 7px 14px;
+  border-color: color-mix(in srgb, var(--ac) 45%, transparent);
+  font-size: 12px;
+  white-space: nowrap;
+}
+#mlh button {
+  flex: none;
+  padding: 1px 9px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+/* 预警记录：类型筛选、每条下面的“之后怎样了”、再看更多 */
+.alf {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.lg {
+  overflow-wrap: anywhere;
+}
+.lgm {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0 8px;
+}
+.lgo {
+  margin-top: 2px;
+  color: var(--mu);
+  font-size: 11px;
+}
+.lgo.o-bounce,
+.lgo.o-break {
+  color: var(--tx);
+}
+.almore {
+  display: flex;
+  margin: 6px auto 0;
+}
+.t-ml,
+.k-ml {
+  --k: var(--ac);
+}
+@media (max-width: 900px) {
+  #mlh {
+    top: 8px;
+    left: 50%;
+    white-space: normal;
+  }
+}
+
+/* ===== 界面整理（2026-11-27，SPEC 3.3.15）：收起来的说明、预警记录的小结、窄屏的下拉菜单和弹出提示 ===== */
+/* 收起来的说明：一行小字，点开才是整段 */
+.more {
+  margin-top: 4px;
+}
+.more > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--mu);
+  font-size: 11px;
+  user-select: none;
+}
+.more > summary::before {
+  content: '';
+  width: 4px;
+  height: 4px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform var(--t) var(--ease);
+}
+.more[open] > summary::before {
+  transform: translateY(-1px) rotate(45deg);
+}
+.more > summary:hover {
+  color: var(--tx);
+}
+.more > .note2 {
+  margin: 4px 0 2px;
+}
+/* 预警记录下面的一行小结：几个数 */
+.lgs {
+  margin: 8px 2px 0;
+  color: var(--mu);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+.lgs b {
+  color: var(--tx);
+}
+/* “提醒哪几类”块里的勾选框不再套一层边框（块自己有边） */
+.blk .opts {
+  padding: 0;
+  border: 0;
+}
+@media (max-width: 900px) {
+  /* 下拉菜单改成贴着顶栏、和顶栏一样宽：原来从各自的按钮往右展开，收着的时候也把页面撑宽，窄屏能横向滚动 */
+  .dd {
+    position: static;
+  }
+  .ddm,
+  #setd .ddm,
+  #mxm {
+    left: 0;
+    right: 0;
+    width: auto;
+    min-width: 0;
+    margin-left: 0;
+    max-height: 70vh;
+    overflow-y: auto;
+    transform-origin: top center;
+  }
+  #toasts {
+    left: 12px;
+    right: 12px;
+    width: auto;
+  }
+}
+/* 交易页每笔右下角的 ✎（日记）：没有标签时不单占一行，浮到上一行的右边（.sg 本身是相对定位） */
+.jnr:not(:has(.jtag)) {
+  position: absolute;
+  right: 4px;
+  bottom: 2px;
+  margin: 0;
+}
+.sg:has(> .jnr:not(:has(.jtag))) > :nth-last-child(2) {
+  padding-right: 22px;
 }
