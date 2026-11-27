@@ -78,7 +78,7 @@ powershell -File tools\autostart.ps1 install
 | BLS 发布日程 | `www.bls.gov/schedule/news_release/bls.ics` | 非农（Employment Situation）、CPI、PPI、JOLTS、就业成本指数的官方发布时间，覆盖未来几个月；时间为美东时间 | 12 小时 |
 | FOMC 日程 | 内置于 `events.js` 的 `FOMC` | 2026 年按美联储日历，2027 年为美联储 2025-09-05 公布的暂定日程，至 2028-01；声明为第二天美东 14:00。过期后页面提示需要补充 | — |
 | BLS 公共 API | `api.bls.gov/publicAPI/v1`（填 `BLS_API_KEY` 用 v2） | 非农就业总人数（算月变化）、失业率、平均时薪、CPI / 核心 CPI（月率用季调、年率用未季调） | 12 小时；非农、CPI 公布后 1 小时内每 10 分钟查一次；存 `var/events/bls.json`，重启不重复查询（未注册每天 25 次） |
-| 新闻 | Google 新闻 RSS 搜索（近 2 天，按主题和语言）、美联储新闻稿 `www.federalreserve.gov/feeds/press_all.xml`、`.env` 的 `NEWS_FEEDS` | 标题、链接、来源、时间；按标题去重，最多 60 条 | 每个 RSS 5 分钟 |
+| 新闻 | Google 新闻 RSS 搜索（近 2 天，按主题和语言）、美联储新闻稿 `www.federalreserve.gov/feeds/press_all.xml`、`.env` 的 `NEWS_FEEDS` | 标题、链接、来源、时间；按标题去重，最多 60 条。黄金主题的搜索结果里，标题的“黄金”不是在说金价的（黄金焦段、黄金海岸…，`NOISE`）丢掉，返回里的 `dropped` 是丢了几条 | 每个 RSS 5 分钟 |
 
 - 合并：Forex Factory 的条目作为主条目（有预期值）；BLS / 美联储日程与它同一次发布（同一组、美东同一天）时只标“已核对官方日程”，时间不一致时附上官方时间；Forex Factory 还没有的（下周以后）单独列出。
 - 存储：拉到的日历按 id 合并存到 `var/events/calendar.json`（`EVENTS_DIR` 可改位置），同一来源同一时间段的旧条目被新数据替换（改期、取消的随之去掉）；保留最近 400 天，过去的事件随使用时间积累，页面在K线上标出。

@@ -268,8 +268,18 @@ function parseFeed(xml) {
 const TOPIC = {
   gold: { zh: '黄金 OR 金价', en: 'gold price OR gold futures' },
   btc: { zh: '比特币 OR 加密货币', en: 'bitcoin OR crypto' },
-  macro: { zh: '美联储 OR 非农 OR CPI OR 通胀 OR 美元', en: 'Federal Reserve OR nonfarm payrolls OR CPI inflation OR dollar' },
+  /* 中文用“美元指数”不用“美元”：光搜“美元”，凡是标题里有金额的都进来（球员薪资、并购、融资），实测 100 条里有 34 条不相干，换了以后剩 3 条 */
+  macro: { zh: '美联储 OR 非农 OR CPI OR 通胀 OR 美元指数', en: 'Federal Reserve OR nonfarm payrolls OR CPI inflation OR dollar' },
 };
+/* 去噪：标题里的词不是在说行情的那些。no 命中、而且 yes 一个都不中才丢——宁可留下一条不相干的，也不丢一条说金价的。
+   黄金：“黄金焦段 / 黄金时段 / 黄金搭档 / 黄金一代”这类说法，和手机影像的评测稿 */
+const NOISE = {
+  gold: {
+    no: /黄金(焦段|时段|时间|时期|时代|周|档|搭档|组合|比例|分割|地段|位置|赛道|法则|年龄|一代|右脚|左脚|圣斗士|眼|屋|海岸|水道|会员|阵容|单身|三角|甲)|影像旗舰|人像横评|人像直出/,
+    yes: /金价|现货黄金|现货金|黄金(期货|价格|ETF|储备|市场|走势|投资|交易|回收|饰品|首饰|股|板块|行情|资产|配置|需求|产量|进口|出口)|期金|沪金|伦敦金|贵金属|白银|盎司|XAU|COMEX|美联储|央行|通胀|美元|避险|世界黄金协会|金条|金饰|金店|\bgold\b/i,
+  },
+};
+const isNoise = (topic, title) => !!NOISE[topic] && NOISE[topic].no.test(title) && !NOISE[topic].yes.test(title);
 const LANGS = { zh: { hl: 'zh-CN', gl: 'CN', ceid: 'CN:zh-Hans' }, en: { hl: 'en-US', gl: 'US', ceid: 'US:en' } };
 const gnews = (q, lang) => 'https://news.google.com/rss/search?' + new URLSearchParams({ q: q + ' when:2d', ...LANGS[lang] });
 const TAGS = [
@@ -414,21 +424,24 @@ function createEvents({ dir, ua = 'MarketLens/0.4 (personal market dashboard)', 
     if (!TOPIC[topic] || !LANGS[lang]) throw new Error('topic 或 lang 无效');
     const list = [{ name: lang == 'zh' ? 'Google 新闻' : 'Google News', url: U.gnews(TOPIC[topic][lang], lang) }, { name: '美联储新闻稿', url: U.fed, off: 1 }, ...feeds];
     const rs = await Promise.all(list.map(feed)), t = now(), seen = new Set(), items = [];
+    let dropped = 0;
     rs.forEach((r, i) =>
       r.items.forEach(x => {
         const k = x.title.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '').slice(0, 48);
         if (!k || seen.has(k)) return;
         seen.add(k);
+        /* 不相干的（见 NOISE）：只筛搜索来的，官方新闻稿和自己加的 RSS 不筛 */
+        if (i === 0 && isNoise(topic, x.title)) { dropped++; return; }
         const ts = Number.isFinite(x.ts) ? Math.min(x.ts, t) : null;
         if (ts != null && ts < t - 7 * 864e5) return;
         items.push({ id: k, title: x.title.slice(0, 300), link: x.link, source: (x.source || list[i].name).slice(0, 60), feed: list[i].name, off: !!list[i].off, ts, tags: TAGS.filter(([, re]) => re.test(x.title)).map(([n]) => n) });
       })
     );
     items.sort((a, b) => (b.ts || 0) - (a.ts || 0));
-    return { at: t, topic, lang, items: items.slice(0, 60), sources: list.map((f, i) => ({ name: f.name, ok: !rs[i].err, at: rs[i].at, err: rs[i].err, n: rs[i].items.length })) };
+    return { at: t, topic, lang, dropped, items: items.slice(0, 60), sources: list.map((f, i) => ({ name: f.name, ok: !rs[i].err, at: rs[i].at, err: rs[i].err, n: rs[i].items.length })) };
   }
 
   return { calendar, news };
 }
 
-module.exports = { createEvents, parseFeeds, TOPIC, LANGS, zoned, etDate, zhName, parseICS, fromFF, fromBLS, fromFOMC, merge, blsData, parseFeed };
+module.exports = { createEvents, parseFeeds, TOPIC, LANGS, isNoise, zoned, etDate, zhName, parseICS, fromFF, fromBLS, fromFOMC, merge, blsData, parseFeed };

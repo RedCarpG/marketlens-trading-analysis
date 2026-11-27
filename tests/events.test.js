@@ -390,3 +390,28 @@ test('news：主题 × 语言、去重、过滤 7 天前、标签；单个来源
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('news 去噪：“黄金焦段”这类不是说行情的丢掉并计数；说金价的不丢；官方新闻稿和别的主题不筛', async () => {
+  const noise = ['四款旗舰人像横评：65mm黄金焦段与自然肤色直出', '“黄金海岸”憧憬经济“黄金时代”', '国足黄金一代聚首'],
+    keep = ['黄金时段金价跳水，现货黄金失守 3600', '黄金周金饰消费回暖', '世界黄金协会：黄金配置比例可在 5% 至 28% 之间', 'Gold hits record', '今日黄金：触及逾一年低位后迎来反弹'];
+  assert.deepEqual(noise.map(s => E.isNoise('gold', s)), [true, true, true]);
+  assert.deepEqual(keep.map(s => E.isNoise('gold', s)), [false, false, false, false, false]);
+  assert.equal(E.isNoise('macro', noise[0]), false);
+  /* 中文宏观的搜索词里不单搜“美元”（凡是带金额的标题都会进来） */
+  assert.doesNotMatch(E.TOPIC.macro.zh, /美元(?!指数)/);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ml-ev-')),
+    t = Date.parse('2026-10-25T08:00:00Z'),
+    item = s => `<item><title>${s}</title><link>https://n.test/${encodeURIComponent(s)}</link><pubDate>Sun, 25 Oct 2026 07:00:00 GMT</pubDate></item>`,
+    rss = list => `<rss><channel>${list.map(item).join('')}</channel></rss>`;
+  try {
+    /* 搜索结果里两条噪声、一条金价；官方新闻稿那一路即使标题撞上也不筛 */
+    const up = fakeFetch({ 'https://gn.test/zh': rss([noise[0], keep[0], noise[2]]), [URLS.fed]: rss([noise[1]]) }),
+      ev = E.createEvents({ dir, fetchImpl: up.f, now: () => t, urls: URLS }),
+      r = await ev.news('gold', 'zh');
+    assert.equal(r.dropped, 2);
+    assert.deepEqual(r.items.map(x => x.title).sort(), [noise[1], keep[0]].sort());
+    assert.equal((await ev.news('macro', 'zh')).dropped, 0);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

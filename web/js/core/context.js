@@ -1,4 +1,5 @@
-/* 情境（纯计算）：波动状态——现在的 ATR 在过去一年里排在什么位置；交易时段——按 UTC 划分亚洲 / 欧洲 / 美国，各时段平常的波幅。
+/* 情境（纯计算）：波动状态——现在的 ATR 在过去一年里排在什么位置；交易时段——按 UTC 划分亚洲 / 欧洲 / 美国，各时段平常的波幅；
+   相关品种——常放在一起看的几样东西最近各动了多少、和它是一起动还是反着动（在文件末尾）。
    只给事实，不下结论 */
 /* ===== 交易时段 =====
    UTC 小时，含起点不含终点。复盘按开仓时间分组（review.js）、图上的时段底色（marks.js）、面板里的波幅都用这一份 */
@@ -108,4 +109,95 @@ function volText(v, { T, dp = 2 }) {
   if (!v.below) return `${head}是${span}里最小的`;
   if (v.n < 20) return `${head}${span}的 ${v.n} 根里有 ${v.below} 根比它小`;
   return `${head}${span}里比 ${Math.max(1, Math.min(99, v.pct))}% 的时候大`;
+}
+
+/* ===== 相关品种 =====
+   看一个品种时顺手看几样常被放在一起看的东西（看黄金时：美元指数、美国 10 年期收益率、白银），各自最近动了多少、最近和它是一起动还是反着动。
+   只列数：涨跌多少、相关系数多少。不说谁带动谁，也不由此推以后。
+   base、bars：两边的日线（升序，最后一根可以是还没走完的今天）。
+   unit：'pct' 涨跌按比例；'bp' 按基点——收益率这类本身就是百分数的，4.93 到 4.89 是 -4 个基点。
+   d1 / d5：最新一根比前一根、比 5 根之前（自己的K线，不管另一边）。
+   相关：先取两边都有K线的那些 UTC 日，再算相邻两个共同日之间各自的变化（一边休市的那天两边都跳过，变化跨的是同一段时间），
+   取最近 win 个，求皮尔逊相关。不到 REL_MIN 个不算（r 为 null）。
+   |r| 到 REL_CUT 才说同向 / 反向：20 个样本时，两串不相干的数也常常算出 ±0.4 上下的相关（5% 水平的临界值 0.44，1% 是 0.56；
+   测试里随手写的一串就到了 -0.47），所以门槛取 0.55。另算一个更长的（long 个交易日，默认 60）放在旁边对照：长的更稳，短的更近。
+   长的那个样本多，门槛可以低：够 REL_LMIN 个交易日时，|rL| 到 REL_CUTL（60 个样本 1% 水平的临界值 0.33）算“放长了看偏同向 / 偏反向”（relL）。
+   返回 { last, ts, d1, d5, n 用了几个交易日, r, rel: 1 同向 / -1 反向 / 0 看不出 / null 没算, nL, rL, relL 长的那个 }；K线不到 2 根返回 null */
+const REL_WIN = 20,
+  REL_LONG = 60,
+  REL_MIN = 12,
+  REL_CUT = 0.55,
+  REL_LMIN = 40,
+  REL_CUTL = 0.33;
+/* 皮尔逊相关；不到 REL_MIN 个、或有一边一直没动（常数，相关没有定义）时返回 null */
+function relCorr(X, Y) {
+  const m = X.length;
+  if (m < REL_MIN) return null;
+  const mx = X.reduce((s, v) => s + v, 0) / m,
+    my = Y.reduce((s, v) => s + v, 0) / m;
+  let sxy = 0,
+    sxx = 0,
+    syy = 0;
+  for (let i = 0; i < m; i++) {
+    sxy += (X[i] - mx) * (Y[i] - my);
+    sxx += (X[i] - mx) ** 2;
+    syy += (Y[i] - my) ** 2;
+  }
+  return sxx > 0 && syy > 0 ? sxy / Math.sqrt(sxx * syy) : null;
+}
+function relRow(base, bars, { unit = 'pct', win = REL_WIN, long = REL_LONG } = {}) {
+  const n = bars.length;
+  if (n < 2) return null;
+  const chg = (a, b) => (unit == 'bp' ? (b - a) * 100 : b / a - 1),
+    day = t => Math.floor(t / 864e5),
+    last = bars[n - 1],
+    bc = new Map(base.map(x => [day(x.timestamp), x.close])),
+    both = bars.filter(x => bc.has(day(x.timestamp))),
+    xs = [],
+    ys = [];
+  for (let i = 1; i < both.length; i++) {
+    xs.push(bc.get(day(both[i].timestamp)) / bc.get(day(both[i - 1].timestamp)) - 1);
+    ys.push(chg(both[i - 1].close, both[i].close));
+  }
+  const m = Math.min(win, xs.length),
+    r = relCorr(xs.slice(-win), ys.slice(-win)),
+    /* 长的那个：共同的交易日比短的多才有意义 */
+    nL = Math.min(long, xs.length),
+    rL = nL > m ? relCorr(xs.slice(-long), ys.slice(-long)) : null;
+  return {
+    last: last.close,
+    ts: last.timestamp,
+    d1: chg(bars[n - 2].close, last.close),
+    d5: n > 5 ? chg(bars[n - 6].close, last.close) : null,
+    n: m,
+    r,
+    rel: r == null ? null : r >= REL_CUT ? 1 : r <= -REL_CUT ? -1 : 0,
+    nL: rL == null ? null : nL,
+    rL,
+    relL: rL == null || nL < REL_LMIN ? null : rL >= REL_CUTL ? 1 : rL <= -REL_CUTL ? -1 : 0,
+  };
+}
+/* 一个变化写成字：比例写百分比（+0.31%），基点写“+4.3 基点”；没有就是 — */
+const relChg = (v, unit) =>
+  v == null
+    ? '—'
+    : unit == 'bp'
+      ? `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(1)} 基点`
+      : `${v >= 0 ? '+' : '−'}${Math.abs(v * 100).toFixed(2)}%`;
+/* 写成一句：最近 N 个交易日，谁和它多半同向、谁多半反着走、谁看不出明显关系。rows：[{ name, n, r, rel, nL, relL }]（没算出相关的不提）。
+   近的看不出、放长了看得出的单说一句（“放到 60 个交易日里偏同向”）。name 是被比的那个品种念出来的名字。一条都没有时返回空串 */
+function relText(rows, name) {
+  const ok = rows.filter(x => x && x.rel != null);
+  if (!ok.length) return '';
+  const names = f => ok.filter(f).map(x => x.name),
+    same = names(x => x.rel === 1),
+    opp = names(x => x.rel === -1),
+    far = ok.filter(x => x.rel === 0 && x.relL),
+    none = names(x => x.rel === 0 && !x.relL),
+    parts = [];
+  if (same.length) parts.push(`${same.join('、')}和${name}多半同涨同跌`);
+  if (opp.length) parts.push(`${opp.join('、')}和${name}多半反着走`);
+  for (const x of far) parts.push(`${x.name}近的看不出，放到 ${x.nL} 个交易日里偏${x.relL > 0 ? '同向' : '反向'}`);
+  if (none.length) parts.push(`${none.join('、')}和${name}看不出明显关系`);
+  return `最近 ${Math.min(...ok.map(x => x.n))} 个交易日：${parts.join('；')}。`;
 }

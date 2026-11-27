@@ -450,7 +450,11 @@ ${more('怎么算的', `用 ${esc(EVS.src)}（${fmt('1d', EVS.from)} 起）。�
             const u = /^https?:\/\//i.test(x.link) ? x.link : '';
             return `<a class="nwi" data-key="n|${esc(x.id)}"${u ? ` href="${esc(u)}" target="_blank" rel="noopener noreferrer"` : ''}><div class="nt">${esc(x.title)}</div><div class="mu sm">${x.off ? '<span class="tag o">官方</span>' : ''}${esc(x.source)}${x.ts ? ' · ' + evAgo(now - x.ts) : ''}${(x.tags || []).map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div></a>`;
           })
-          .join('') || '<div class="empty">暂无</div>');
+          .join('') || '<div class="empty">暂无</div>') +
+        /* 代理筛掉的不相干的（server/events.js 的 NOISE）：说一声筛了几条，免得以为漏了 */
+        (N.dropped
+          ? `<div class="mu sm">另有 ${N.dropped} 条不相干的没列出来（标题里的“黄金”不是在说金价）</div>`
+          : '');
   return `${tools}<div class="srcs">${srcs}</div>${warn}${next}
 ${study}
 ${blk('evd', `官方数据 <span class="mu">BLS${D.at ? ' · ' + fmt('1h', D.at) : ''}</span>`, dat + datNote)}

@@ -139,3 +139,90 @@ test('模拟行情上：各周期都说得出一句，话里没有判断', () =>
   const s = sessStats(closed('1h', all['1h']), '1h');
   assert.ok(s.days >= 15 && s.rows.every(r => r.n >= 10 && r.avg > 0));
 });
+
+/* ===== 相关品种 ===== */
+const [relRow, relText, relChg] = ['relRow', 'relText', 'relChg'].map(get);
+const RDAY = 864e5,
+  RD0 = Date.UTC(2026, 9, 1);
+/* 由每天的涨跌比例造一串日线（第一根收 100）；skip 里的那几天没有K线 */
+const dayBars = (rets, skip = [], start = 100) => {
+  const out = [{ timestamp: RD0, close: start }];
+  let c = start;
+  rets.forEach((r, i) => {
+    c *= 1 + r;
+    if (!skip.includes(i + 1)) out.push({ timestamp: RD0 + (i + 1) * RDAY, close: c });
+  });
+  return out;
+};
+const RETS = [0.01, -0.02, 0.005, 0.012, -0.007, 0.02, -0.011, 0.003, -0.015, 0.008, 0.004, -0.009, 0.017, -0.004, 0.006, -0.013, 0.01, 0.002, -0.006, 0.011, -0.003, 0.007];
+
+test('relRow：最新一根比前一根、比 5 根之前；每天都同向相关是 1、每天都相反是 -1；按两边都有的日子对齐', () => {
+  const base = dayBars(RETS),
+    same = relRow(base, dayBars(RETS.map(r => r * 2))),
+    opp = relRow(base, dayBars(RETS.map(r => -r)));
+  assert.deepEqual([same.n, +same.r.toFixed(6), same.rel], [20, 1, 1]);
+  assert.deepEqual([opp.n, +opp.r.toFixed(3), opp.rel], [20, -1, -1]);
+  const b = dayBars(RETS.map(r => r * 2));
+  assert.ok(Math.abs(same.d1 - (b.at(-1).close / b.at(-2).close - 1)) < 1e-12);
+  assert.ok(Math.abs(same.d5 - (b.at(-1).close / b.at(-6).close - 1)) < 1e-12);
+  assert.deepEqual([same.last, same.ts], [b.at(-1).close, b.at(-1).timestamp]);
+  /* 一边缺了两天：那两天两边都跳过，变化跨的是同一段，所以完全同向的仍然是 1 */
+  const gap = relRow(base, dayBars(RETS, [5, 11]));
+  assert.deepEqual([gap.n, +gap.r.toFixed(6)], [20, 1]);
+  /* 另一边多出来的日子（周末也交易的品种）不参加 */
+  const wk = relRow(dayBars(RETS, [3, 4]), dayBars(RETS));
+  assert.deepEqual([wk.n, +wk.r.toFixed(6)], [20, 1]);
+});
+
+test('relRow：收益率按基点；样本不够、有一边不动时不算相关；相关不够强时归到“看不出”', () => {
+  const base = dayBars(RETS),
+    y = RETS.map((r, i) => ({ timestamp: RD0 + i * RDAY, close: 4.5 + i * 0.25 })),
+    bp = relRow(base, y, { unit: 'bp' });
+  assert.equal(bp.d1, 25); // 4.50 → 4.75 是 25 个基点
+  assert.equal(bp.d5, 125);
+  assert.deepEqual([bp.r, bp.rel], [null, null]); // 每天都涨一样多：没有起伏，相关没有定义
+  const few = relRow(dayBars(RETS.slice(0, 8)), dayBars(RETS.slice(0, 8)));
+  assert.deepEqual([few.n, few.r, few.rel], [8, null, null]);
+  assert.equal(relRow(base, [{ timestamp: RD0, close: 1 }]), null);
+  /* 把同一串涨跌错开三天：和原来的几乎不相关，归到「看不出」 */
+  const weak = relRow(base, dayBars(RETS.map((_, i) => RETS[(i + 3) % RETS.length])));
+  assert.ok(Math.abs(weak.r) < 0.2, `r = ${weak.r}`);
+  /* 随手写的一串「不相干」的涨跌，20 天里相关也能到 -0.47：所以门槛定在 0.55，这一串归到「看不出」 */
+  const chance = relRow(base, dayBars([0.004, 0.011, -0.006, 0.009, 0.001, -0.012, 0.007, 0.015, -0.002, -0.008, 0.013, 0.003, -0.01, 0.006, 0.002, 0.012, -0.005, -0.014, 0.009, 0.001, 0.008, -0.004]));
+  assert.ok(chance.r < -0.45 && chance.r > -0.55 && chance.rel === 0, `r = ${chance.r}`);
+  /* 长的那个：共同的交易日比 20 个多才给；这里只有 22 个，是用全部 22 个算的 */
+  assert.deepEqual([weak.n, weak.nL, weak.rL != null], [20, 22, true]);
+  const long = relRow(dayBars([...RETS, ...RETS, ...RETS, ...RETS]), dayBars([...RETS, ...RETS, ...RETS, ...RETS].map(r => -r)));
+  assert.deepEqual([long.n, long.nL, +long.rL.toFixed(3), long.relL], [20, 60, -1, -1]);
+  assert.equal(weak.relL, null); // 长的那个不到 40 个交易日：不下判断
+  assert.deepEqual([few.nL, few.rL], [null, null]);
+  assert.equal(weak.rel, 0);
+});
+
+test('relChg / relText：变化的写法；一句话里只有同向、反着走、看不出，没有因果和预测', () => {
+  assert.deepEqual([relChg(0.00314, 'pct'), relChg(-0.0126, 'pct'), relChg(4.26, 'bp'), relChg(-0.5, 'bp'), relChg(null, 'pct')], ['+0.31%', '−1.26%', '+4.3 基点', '−0.5 基点', '—']);
+  const s = relText(
+    [
+      { name: '美元指数', n: 20, r: -0.62, rel: -1 },
+      { name: '白银', n: 20, r: 0.8, rel: 1 },
+      { name: '美国 10 年期收益率', n: 19, r: -0.1, rel: 0 },
+      { name: '没算出来的', n: 3, r: null, rel: null },
+      null,
+    ],
+    '黄金'
+  );
+  assert.equal(s, '最近 19 个交易日：白银和黄金多半同涨同跌；美元指数和黄金多半反着走；美国 10 年期收益率和黄金看不出明显关系。');
+  assert.doesNotMatch(s, /因为|所以|带动|导致|会涨|会跌|建议|利好|利空/);
+  assert.equal(relText([{ name: 'x', n: 3, r: null, rel: null }], '黄金'), '');
+  /* 近的不到门槛、放长了到了的：单说一句 */
+  assert.equal(
+    relText(
+      [
+        { name: '黄金期货', n: 20, r: 0.54, rel: 0, nL: 60, rL: 0.47, relL: 1 },
+        { name: '美元指数', n: 20, r: -0.02, rel: 0, nL: 60, rL: -0.09, relL: 0 },
+      ],
+      '比特币'
+    ),
+    '最近 20 个交易日：黄金期货近的看不出，放到 60 个交易日里偏同向；美元指数和比特币看不出明显关系。'
+  );
+});
