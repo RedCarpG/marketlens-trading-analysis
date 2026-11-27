@@ -3090,3 +3090,13 @@ body.mlpick #chart * {
     width: auto;
   }
 }
+/* 交易页每笔右下角的 ✎（日记）：没有标签时不单占一行，浮到上一行的右边（.sg 本身是相对定位） */
+.jnr:not(:has(.jtag)) {
+  position: absolute;
+  right: 4px;
+  bottom: 2px;
+  margin: 0;
+}
+.sg:has(> .jnr:not(:has(.jtag))) > :nth-last-child(2) {
+  padding-right: 22px;
+}

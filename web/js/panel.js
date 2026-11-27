@@ -120,10 +120,10 @@ ${
 }</div>`;
         })
         .join('') || '<div class="empty">附近没有关键价位</div>',
-    /* 关键价位：上方阻力从高到低、中间最新价、下方支撑从高到低 */
+    /* 关键价位：上方阻力从高到低、中间最新价、下方支撑从高到低。一行写得下：挡回次数写成“×N”（和图上的标签一样，悬停有说明） */
     ML = mainLv(m.L, nw, a.a, tf),
     lvr = l =>
-      `<div class="lvr${hlSel === 'l|' + l.p ? ' on' : ''}" data-key="l|${l.p}" data-lv="${l.p}" title="点击在图上标出并定位到最近一次触及，再点取消"><span class="d" style="background:${dc(l.side)}"></span><b style="color:${dc(l.side)}">${f(l.p)}</b><span class="mu sm">${l.side > 0 ? '支撑' : '阻力'} · ${lvi(l)}</span><span class="mu sm">${(Math.abs(l.p - nw) / a.a).toFixed(1)} ATR</span></div>`,
+      `<div class="lvr${hlSel === 'l|' + l.p ? ' on' : ''}" data-key="l|${l.p}" data-lv="${l.p}" title="点击在图上标出并定位到最近一次触及，再点取消"><span class="d" style="background:${dc(l.side)}"></span><b style="color:${dc(l.side)}">${f(l.p)}</b><span class="mu sm">${l.side > 0 ? '支撑' : '阻力'} ${l.tfs.join('·')}${l.touch >= 3 ? ` <span title="被挡回 ${l.touch} 次">×${l.touch}</span>` : ''}</span><span class="mu sm">${(Math.abs(l.p - nw) / a.a).toFixed(1)} ATR</span></div>`,
     keys =
       [...ML.res]
         .sort((u, v) => v.p - u.p)
@@ -153,7 +153,7 @@ ${evRisk()}
 ${aiBlock()}
 ${m.why.length ? blk('why', `评分说明 <span class="n">${m.why.length}</span>`, `<ul class="why">${m.why.map(w => `<li>${w}</li>`).join('')}</ul>`) : ''}
 ${blk('sc', `价格行为情景 <span class="mu">${tf} · 纯K线</span>`, scn, chip('pl', '图上') + '<button class="chip" id="btgo" title="用当前品种的历史K线回测情景、信号和评分（B）">回测</button>')}
-${blk('lv', `关键价位 <span class="mu">${tf} 及更大</span>`, keys, chip('hl', '前高前低') + chip('sr', '支撑阻力'))}
+${blk('lv', `关键价位 <span class="mu" title="${tf} 和更大周期的价位">${tf}+</span>`, keys, chip('hl', '前高前低') + chip('sr', '支撑阻力'))}
 ${blk('sg', `近期信号 <span class="n">${sigs.length}</span>`, sgl, chip('ar', '图上'))}
 ${blk('kv', `关键数值 <span class="mu">${tf}</span>`, `<div class="row"><span>RSI(14)</span><b>${a.rsi.toFixed(1)}</b></div><div class="row"><span>ATR(14)</span><b>${f(a.a)}</b></div>${volBlock()}${a.hv ? '' : '<div class="row"><span>成交量</span><b class="mu">无（放量项不计分）</b></div>'}`)}
 ${ssBlock()}
