@@ -159,7 +159,7 @@ ${blk('kv', `关键数值 <span class="mu">${tf}</span>`, `<div class="row"><spa
 ${ssBlock()}
 <p class="disc">信号、评分与情景由规则自动生成，初步回测未发现可靠优势，仅作辅助参考，不构成投资建议。演示数据为随机模拟。</p>`;
 }
-/* 波动状态（分析页“关键数值”里，ATR 那一行下面）：当前周期的 ATR(14) 在过去一年里排在什么位置，一句事实 + 一条刻度 + 怎么比的。
+/* 波动状态（分析页“关键数值”里，ATR 那一行下面）：当前周期的 ATR(14) 在过去一年里排在什么位置，一句事实 + 一条刻度 + 收起来的“怎么比的”。
    计算在 core/context.js 的 volState；已收盘K线没变就不重算 */
 let volMemo = { k: '', v: null };
 function volBlock() {
@@ -170,7 +170,7 @@ function volBlock() {
   if (!v) return '<div class="volst"><div class="mu sm">波动状态：已收盘K线太少，排不了位</div></div>';
   return `<div class="volst"><div class="vt">${volText(v, { T: tf, dp: cur.p })}</div>
 <div class="vbar" title="左边是最小，右边是最大"><i style="left:${((v.below / v.n) * 100).toFixed(1)}%"></i></div>
-<div class="mu sm">和它之前 ${v.n} 根已收盘K线（${fmt(tf, v.from)} 起）的 ATR(14) 比，其中 ${v.below} 根比它小。只说波动大小，不说方向。</div></div>`;
+${more('怎么比的', `和它之前 ${v.n} 根已收盘K线（${fmt(tf, v.from)} 起）的 ATR(14) 比，其中 ${v.below} 根比它小。只说波动大小，不说方向。`)}</div>`;
 }
 /* 交易时段（分析页最下面一块）：现在是哪个时段、各时段平常的波幅。时段按 UTC 划分（core/context.js 的 SESS）。
    波幅用已加载的 1 小时K线算（没有时用 15 分钟）：每天每个时段里最高价减最低价，再取平均；旁边写它相当于几个日线 ATR。
@@ -206,11 +206,12 @@ function ssBlock() {
     'ss',
     `交易时段 <span class="mu">平常的波幅</span>`,
     `<div class="mu sm ssn">现在是${cs.n}（UTC ${new Date(now).toISOString().slice(11, 16)}）</div>${rows}
-<div class="note2">波幅 = 一个时段里最高价减最低价，对已加载的 ${TFN[T]}K线里的 ${st.days} 天（${fmt('1d', st.from)} 起）取平均，单位是价格${da ? `；旁边是它相当于几个日线 ATR（现在的日线 ATR ${f(da)}）` : ''}。还没走完的时段、K线不到一半的时段不算。${SESS_TFS.includes(tf) ? '' : `图上的底色只在 15 分钟、1 小时周期画，${tf} 周期不画。`}</div>`,
+${SESS_TFS.includes(tf) ? '' : `<div class="mu sm ssn">图上的底色只在 15 分钟、1 小时周期画，${tf} 周期不画。</div>`}
+${more('怎么算的', `波幅 = 一个时段里最高价减最低价，对已加载的 ${TFN[T]}K线里的 ${st.days} 天（${fmt('1d', st.from)} 起）取平均，单位是价格${da ? `；旁边是它相当于几个日线 ATR（现在的日线 ATR ${f(da)}）` : ''}。还没走完的时段、K线不到一半的时段不算。`)}`,
     chip('ss', '图上')
   );
 }
-/* 预警页：总开关、几类提醒（可单独勾选）、通知权限状态、我画的线、Cirra 播报、预警记录 */
+/* 预警页（2026-11-27 重排，常看的在上、设置在下）：总开关 → 我画的线 → 预警记录 → 提醒哪几类（默认收着，里面有通知权限状态）→ Cirra 播报 */
 function alPanel() {
   const np = !('Notification' in window)
       ? '浏览器不支持系统通知，只在页面内弹出'
@@ -244,7 +245,7 @@ ${
     )
     .join('') || `<div class="empty">${cur.sym} 还没有自己画的线</div>`
 }
-<div class="note2">按品种记在这个浏览器里，换周期也在。价格走到线的 ±0.15 ATR（按当前周期的 ATR）时提醒一次，离开 0.5 ATR 以后再回来才会再提醒；加线时价格已经在线上的，这一次不提醒。预警关着时线照样画，只是不响。</div>`
+${more('什么时候响', '按品种记在这个浏览器里，换周期也在。价格走到线的 ±0.15 ATR（按当前周期的 ATR）时提醒一次，离开 0.5 ATR 以后再回来才会再提醒；加线时价格已经在线上的，这一次不提醒。预警关着时线照样画，只是不响；也可以按住 Alt 直接在图上点。')}`
           ),
     /* 预警记录：按类型筛，价位类的补一句之后怎样了 */
     tys = Object.keys(AL_TY).filter(k => alLog.some(r => r.ty == k)),
@@ -277,23 +278,40 @@ ${
         ? `<button class="chip almore" id="almore">再看 ${Math.min(50, recs.length - alShow)} 条（共 ${recs.length} 条）</button>`
         : '') +
       (os.n
-        ? `<div class="note2">价位类 ${os.n} 条（关键价位、我画的线）：之后 10 根K线内先被挡回 1 个 ATR 的 ${os.bounce} 条，先穿过去 1 个 ATR 的 ${os.brk} 条，未定 ${os.open} 条${os.none ? `，还没有结论 ${os.none} 条（还在看，或者那段K线现在没加载、对不上）` : ''}。距离从价位算起，ATR 用响的那一刻的；条数少时看不出规律。</div>`
+        ? `<div class="lgs">价位类 ${os.n} 条：被挡回 <b>${os.bounce}</b> · 穿过去 <b>${os.brk}</b> · 未定 <b>${os.open}</b>${os.none ? ` · 没结论 <b>${os.none}</b>` : ''}</div>`
         : '') +
-      (alLog.length ? `<div class="note2">记录存在这个浏览器里，最多留 ${AL_MAX} 条，不上传。</div>` : '');
+      (alLog.length
+        ? more(
+            '怎么判定的、存在哪',
+            `价位类（关键价位、我画的线）看响了以后的 10 根已收盘K线：先往回走 1 个 ATR 算被挡回，先穿过价位 1 个 ATR 算穿过去，都没到是未定。距离从价位算起，ATR 用响的那一刻的。没结论的是还在看，或者那段K线现在没加载、对不上。条数少时看不出规律。<br>记录存在这个浏览器里，最多留 ${AL_MAX} 条，不上传。`
+          )
+        : ''),
+    /* 提醒哪几类：设置一类，默认收着，标题上写开着几项 */
+    kinds = ['lv', 'ml', 'sc', 'sl', 'ck', 'ev'],
+    alo = blk(
+      'alo',
+      `提醒哪几类 <span class="mu">开着 ${kinds.filter(k => AL[k]).length} / ${kinds.length}</span>`,
+      `<div class="opts">${opt('lv', '到达关键价位', '价格进入关键价位 ±0.15 ATR')}${opt('ml', '我画的线', '价格进入我画的线 ±0.15 ATR。交给 Cirra 时算在“关键价位”那一项里')}${opt('sc', '情景触发 / 失效', '价格行为情景状态变化')}${opt('sl', '接近我的止损 / 止盈', '距离 0.5 ATR 以内（eToro 持仓）')}${opt('ck', '开仓体检', '新开一笔时对照我的守则，说哪几条没守（eToro 持仓，每分钟看一次；守则在交易页定）')}${opt('ev', '重要经济事件', `${ccyOf().join(' / ')} 高影响事件公布前 30 / 5 分钟；BLS 公布新的非农、CPI 时（需本地代理）`)}</div>
+<div class="note2">价位、情景、止损止盈只监控当前品种和周期，需保持页面打开；开启后自动连接实时行情。${np}。</div>`,
+      '',
+      0
+    );
   return `<div class="alh"><div><b>价格预警</b><div class="mu sm">${AL.on ? `<span class="lvd"></span>监控中 · ${cur.sym} · ${tf}` : '未开启'}</div></div>
 <button class="swb${AL.on ? ' on' : ''}" data-al-on role="switch" aria-checked="${!!AL.on}" title="${AL.on ? '关闭预警' : '开启预警'}"></button></div>
-<div class="opts">${opt('lv', '到达关键价位', '价格进入关键价位 ±0.15 ATR')}${opt('ml', '我画的线', '价格进入我画的线 ±0.15 ATR；线在下面加。交给 Cirra 时算在“关键价位”那一项里')}${opt('sc', '情景触发 / 失效', '价格行为情景状态变化')}${opt('sl', '接近我的止损 / 止盈', '距离 0.5 ATR 以内（eToro 持仓）')}${opt('ck', '开仓体检', '新开一笔时对照我的守则，说哪几条没守（eToro 持仓，每分钟看一次；守则在交易页定）')}${opt('ev', '重要经济事件', `${ccyOf().join(' / ')} 高影响事件公布前 30 / 5 分钟；BLS 公布新的非农、CPI 时（需本地代理）`)}</div>
-<div class="note2">价位、情景、止损止盈只监控当前品种和周期，需保持页面打开；开启后自动连接实时行情。${np}。</div>
 ${mls}
-${ciPanel()}
-${blk('all', `预警记录 <span class="n">${alLog.length}</span>`, alb, alLog.length ? `<button class="chip" id="alclr" title="清空全部预警记录">${Date.now() - alClr < 4000 ? '再点一次清空' : '清空'}</button>` : '')}`;
+${blk('all', `预警记录 <span class="n">${alLog.length}</span>`, alb, alLog.length ? `<button class="chip" id="alclr" title="清空全部预警记录">${Date.now() - alClr < 4000 ? '再点一次清空' : '清空'}</button>` : '')}
+${alo}
+${ciPanel()}`;
 }
 /* 右侧可折叠块：标题右侧放该块对应的图上标注开关；开合状态记在本地，默认展开 */
 let BLK = LS.get('blk', {});
 const chip = (k, label) =>
   `<button class="chip${MK[k] ? ' on' : ''}" data-mk="${k}" title="在图上显示/隐藏"><svg width="18" height="9" viewBox="0 0 22 10">${SW[k]}</svg>${label}</button>`;
-const blk = (id, title, body, tools = '') =>
-  `<details class="blk" data-b="${id}"${BLK[id] === 0 ? '' : ' open'}><summary><span class="bt">${title}</span><span class="btools">${tools}</span></summary><div class="bb">${body}</div></details>`;
+/* def：没点过时是开着（1）还是收着（0）。设置一类的块默认收着，常看的默认开着 */
+const blk = (id, title, body, tools = '', def = 1) =>
+  `<details class="blk" data-b="${id}"${(BLK[id] ?? def) ? ' open' : ''}><summary><span class="bt">${title}</span><span class="btools">${tools}</span></summary><div class="bb">${body}</div></details>`;
+/* 收起来的说明：口径、怎么算的这类话平时不占地方，点一下那行小字才展开（开合不记，刷新页面后收回去） */
+const more = (sum, html) => `<details class="more"><summary>${sum}</summary><div class="note2">${html}</div></details>`;
 /* 切换某类图上标注：顶栏“标注”菜单和块内开关共用，保持同步 */
 function setMK(k) {
   if (hlSel && ((k == 'tr' && hlSel[0] != 's') || (k == 'ar' && hlSel[0] == 's'))) clearHl(); // 避免与高亮时临时画出的图形重复

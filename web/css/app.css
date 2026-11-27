@@ -3021,6 +3021,51 @@ body.mlpick #chart * {
 }
 
 /* ===== 界面整理（2026-11-27，SPEC 3.3.15）：收起来的说明、预警记录的小结、窄屏的下拉菜单和弹出提示 ===== */
+/* 收起来的说明：一行小字，点开才是整段 */
+.more {
+  margin-top: 4px;
+}
+.more > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--mu);
+  font-size: 11px;
+  user-select: none;
+}
+.more > summary::before {
+  content: '';
+  width: 4px;
+  height: 4px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform var(--t) var(--ease);
+}
+.more[open] > summary::before {
+  transform: translateY(-1px) rotate(45deg);
+}
+.more > summary:hover {
+  color: var(--tx);
+}
+.more > .note2 {
+  margin: 4px 0 2px;
+}
+/* 预警记录下面的一行小结：几个数 */
+.lgs {
+  margin: 8px 2px 0;
+  color: var(--mu);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+.lgs b {
+  color: var(--tx);
+}
+/* “提醒哪几类”块里的勾选框不再套一层边框（块自己有边） */
+.blk .opts {
+  padding: 0;
+  border: 0;
+}
 @media (max-width: 900px) {
   /* 下拉菜单改成贴着顶栏、和顶栏一样宽：原来从各自的按钮往右展开，收着的时候也把页面撑宽，窄屏能横向滚动 */
   .dd {
