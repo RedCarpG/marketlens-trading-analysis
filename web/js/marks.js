@@ -582,7 +582,7 @@ function regOverlays() {
       fg.push({
         type: 'text',
         attrs: { x: w - 8, y: l.ay, text: l.text, align: 'right', baseline: 'middle' },
-        styles: { ...TXT, ...st },
+        styles: { ...TXT, size: e.small ? 11 : 13, ...st },
         ignoreEvent: true,
       });
       return fg;
@@ -876,13 +876,14 @@ function drawMarks(m) {
     items.push({
       name: 'fbLabels',
       points: labs.map(l => ({ timestamp: ts, value: l.v })),
-      extendData: { labs, bg: BG },
+      extendData: { labs, bg: BG, small: !WIDE() },
     });
   const sig = JSON.stringify([
     cur.sym,
     tf,
     theme,
     scheme,
+    WIDE(),
     items.map(i => [i.name, i.points, i.extendData.text, i.extendData.labs && i.extendData.labs.map(l => l.text)]),
   ]);
   if (sig === ovSig) return;
